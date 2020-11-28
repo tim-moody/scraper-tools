@@ -74,14 +74,26 @@ def do_page(path):
         comments.extract()
 
     main_content = page.find("div", id = 'MainContent').find('div', class_='row') #
-
     main_content.find('a', class_='anchor-toolkit').parent.parent.decompose() # left nav and body
     main_content.find('a', class_='anchor-toolkit').parent.parent.decompose()
     listen_list = main_content.find('a', class_='rsbtn_play')
     for tag in main_content.find_all('a', class_='rsbtn_play'):
         tag.decompose()
 
+    left_nav = main_content.find("div", class_='left-menu').ul
+    left_toc  = left_nav.li
+    left_nav.clear()
+    left_nav.append(left_toc)
+
+    left_nav_lines = BeautifulSoup(get_left_nav_lines(), 'html.parser')
+    left_nav.append(left_nav_lines)
+
+    logo_lines = BeautifulSoup(get_logo_lines(), 'html.parser')
+    #main_content.div.insert_before(logo_lines)
+
     page.body.clear()
+    page.body.append(logo_lines)
+    #page.body.append(left_nav)
     page.body.append(main_content)
 
 
@@ -181,6 +193,28 @@ def get_head_lines():
     '''
     return head_lines
 
+def get_logo_lines():
+    logo_lines = '''
+    <div>
+    <img class="ncats-logo-image" alt="National Center for Advancing and Translational Sciences" src="../../assets/NCATS_Logo.png">
+    <img class="gard-logo-image" alt="Genetic and Rare Diseases Information Center, a program of the National Center for Advancing and Translational Sciences" src="../../assets/GARD_logo.png">
+    </div>
+    '''
+    return logo_lines
+
+def get_left_nav_lines():
+    left_nav_lines = '''
+    <li class="no-children">
+    <a href="/diseases/browse-by-first-letter">Browse A-Z</a>
+    </li>
+    <li class="no-children">
+    <a href="/diseases/categories">Find Diseases By Category</a>
+    </li>
+    <li class="no-children">
+    <a href="/glossary" target="_self">Browse Glossary A-Z</a>
+    </li>
+    '''
+    return left_nav_lines
 
 def get_bottom_lines():
     bottom_lines = '''

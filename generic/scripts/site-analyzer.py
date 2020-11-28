@@ -28,6 +28,7 @@ def main(argv):
     global site_redirects
     global site_ignored_urls
     global site_error_urls
+    global image_urls
 
     # Pass in json file name
     if len(sys.argv) > 1:
@@ -57,6 +58,7 @@ def main(argv):
 
     sum_content_types()
     #recursive_visit_extract_urls(channel_dict)
+    image_urls = calc_image_sources()
 
     json_formatted_str = json.dumps(content_types, indent=2)
     print(json_formatted_str)
@@ -165,9 +167,11 @@ def calc_page_children():
         for c in site_pages[p]['children']:
             all_pages[c] = 1
 
-def calc_image_sources():
-    global image_urls
+def calc_image_sources(filter = None):
+    image_urls = {}
     for p in site_pages:
+        if filter and filter not in p:
+            continue
         for c in site_pages[p]['children']:
             contyp = site_urls[c]['content-type'].strip()
             if 'image' in contyp:
@@ -184,6 +188,7 @@ def calc_image_sources():
                         image_urls[u]['children'][c] += 1
                     else:
                         image_urls[u]['children'][c] = 1
+    return image_urls
 
 
 def print_json(inp_dict):
