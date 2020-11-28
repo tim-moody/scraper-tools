@@ -12,7 +12,7 @@ site = 'rarediseases.info.nih.gov'
 
 orig_dir = '/articlelibrary/viewarticle/'
 base_url = 'https://' + site + orig_dir
-src_dir = 'raw/html'
+src_dir = 'raw/html/'
 dst_dir = '/library/www/html/modules/en-nih_rarediseases'
 
 # read urls
@@ -22,17 +22,37 @@ site_urls = adm.read_json(url_json_file)
 def main(argv):
     # need site_urls for type of image - see below
 
-    file_list = os.listdir(src_dir)
-    #file_list = ['article-17922.html','article-41380.html','article-788.html', 'article-99590.html', 'article-29120.html', 'article-16989.html']
-    for filename in file_list:
-        print('Converting ' + filename)
-        if not filename.endswith(".html"):
-            print('Skippinging ' + filename)
-            continue
-        page = do_page(os.path.join(src_dir, filename))
-        html_output = page.encode_contents(formatter='html')
+    disease_catalog = adm.read_json('disease-catalog.json')
 
-        with open(dst_dir + filename, 'wb') as f:
+    disease_list = list(disease_catalog)
+    disease_list = [
+        "/diseases/6710/hyperprolinemia-type-2",
+        "/diseases/1323/chromosome-10p-deletion",
+        "/diseases/5299/chromosome-10p-duplication",
+        "/diseases/3711/chromosome-10q-deletion",
+        "/diseases/8630/chromosome-10q-duplication",
+        "/diseases/13018/10q223q23-microdeletion-syndrome",
+        "/diseases/9882/cortisone-reductase-deficiency",
+        "/diseases/5658/11-beta-hydroxylase-deficiency",
+        "/diseases/1732/chromosome-11p-deletion",
+        "/diseases/5528/wagr-syndrome",
+        "/diseases/10845/chromosome-11p-duplication",
+        "/diseases/9762/potocki-shaffer-syndrome"]
+
+    for disease_url in disease_list:
+        download_file_name = disease_url[1:].replace('/', '.') + '.html'
+        print('Converting ' + download_file_name)
+
+        page = do_page(os.path.join(src_dir, download_file_name))
+        html_output = page.encode_contents(formatter='html')
+        output_file_name = dst_dir + disease_url + '.html'
+        print(output_file_name)
+
+        output_dir = os.path.dirname(output_file_name)
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+
+        with open(output_file_name, 'wb') as f:
             f.write(html_output)
 
 def do_page(path):
@@ -51,29 +71,22 @@ def do_page(path):
         s.extract()
 
     for comments in page.head.findAll(text=lambda text:isinstance(text, Comment)):
-         comments.extract()
+        comments.extract()
 
-    article_parts = page.find_all("div", {"class":"card"}) # there are 2
-    article_text = article_parts[0]
-    article_ref = article_parts[1]
+    main_content = page.find("div", id = 'MainContent').find('div', class_='row') #
 
-    article_text = replace_links(article_text,"/pictures/getimagecontent", '../pictures/')
-    article_ref = replace_links(article_ref,"/pictures/getimagecontent", '../pictures/')
-    article_text = replace_links(article_text,"/media")
-    article_ref = replace_links(article_ref,"/media")
-
-    #logo_img = BeautifulSoup('<img src="../assets/stat-pearls-logo.png">', 'html.parser')
-    #article_text.select('div', class_='card').append(logo_img)
-
-    logo_img = page.new_tag("img", src="../assets/stat-pearls-logo.png")
-    article_text.div.insert_before(logo_img)
+    main_content.find('a', class_='anchor-toolkit').parent.parent.decompose() # left nav and body
+    main_content.find('a', class_='anchor-toolkit').parent.parent.decompose()
+    listen_list = main_content.find('a', class_='rsbtn_play')
+    for tag in main_content.find_all('a', class_='rsbtn_play'):
+        tag.decompose()
 
     page.body.clear()
-    page.body.append(article_text)
-    page.body.append(article_ref)
+    page.body.append(main_content)
+
 
     # convert picture links
-    repl_pic_links(page)
+    #repl_pic_links(page)
 
     head_lines = BeautifulSoup(get_head_lines(), 'html.parser')
 
@@ -164,47 +177,13 @@ def cleanup_url(url): # in future this will be done in spider
 
 def get_head_lines():
     head_lines = '''
-    <link href="../assets/bootstrap.min.css" rel="stylesheet">
-    <link href="../assets/style.css" rel="stylesheet">
-    <link href="../assets/magnific-popup.min.css" rel="stylesheet">
-    <link href="../assets/video-js.css" rel="stylesheet">
-    <style>
-        .h2Styled {
-            color: #985735;
-            border-bottom: 1px solid #97B0C8;
-        }
-
-        ul {
-            padding-left: 40px;
-        }
-
-        ol {
-            padding-left: 40px;
-        }
-
-        .newavailablecont h3 {
-            text-align: center;
-            color: #1e70bb;
-            font-weight: 600;
-            /*text-transform: capitalize;*/
-            font-size: 24px;
-            padding-bottom: 0px;
-        }
-    </style>
+    <link href="../../assets/style.css" rel="stylesheet">
     '''
     return head_lines
 
 
 def get_bottom_lines():
     bottom_lines = '''
-    <script src="../assets/jquery.min.js"></script>
-    <script src="../assets/bootstrap.min.js"></script>
-    <script src="../assets/jquery.magnific-popup.min.js"></script>
-    <script>
-        $(document).ready(function () {
-        $('.image-link').magnificPopup({ type: 'image' });
-        });
-    </script>
     '''
     return bottom_lines
 

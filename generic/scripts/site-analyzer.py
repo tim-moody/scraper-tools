@@ -85,6 +85,17 @@ def sum_content_types():
     for content_type in content_types:
         total_bytes += content_types[content_type]['bytes']
 
+def sum_level1():
+    top_level = {}
+    for u in site_urls:
+        if site_urls[u]['content-type'] != "text/html": continue
+        url_parts = urlparse(u)
+        top_dir = url_parts.path.split('/')[1].lower()
+        if top_dir in top_level:
+            top_level[top_dir] +=1
+        else:
+            top_level[top_dir] =1
+    return top_level
 
 def recursive_visit_extract_urls(subtree):
     global unique_urls
