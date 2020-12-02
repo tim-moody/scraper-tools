@@ -12,17 +12,26 @@ site = 'rarediseases.info.nih.gov'
 
 orig_dir = '/articlelibrary/viewarticle/'
 base_url = 'https://' + site + orig_dir
-src_dir = 'raw/html/'
+src_dir = 'site-download'
 dst_dir = '/library/www/html/modules/en-nih_rarediseases'
 
-# read urls
-url_json_file = site + '_urls.json'
-site_urls = adm.read_json(url_json_file)
+# read stats
+site_urls = adm.read_json(site + '_urls.json')
+site_redirects = adm.read_json(site + '_redirects.json')
+
+disease_catalog = adm.read_json('disease-catalog.json')
+
+page_links = {}
 
 def main(argv):
-    # need site_urls for type of image - see below
+    convert_diseases()
+    convert_nav()
 
-    disease_catalog = adm.read_json('disease-catalog.json')
+def convert_nav():
+    pass
+
+def convert_diseases():
+    # need site_urls for type of image - see below
 
     disease_list = list(disease_catalog)
     disease_list = [
@@ -40,12 +49,13 @@ def main(argv):
         "/diseases/9762/potocki-shaffer-syndrome"]
 
     for disease_url in disease_list:
-        download_file_name = disease_url[1:].replace('/', '.') + '.html'
+        download_file_name = disease_url + '/index.html'
+        #download_file_name = disease_url[1:].replace('/', '.') + '.html'
         print('Converting ' + download_file_name)
 
-        page = do_page(os.path.join(src_dir, download_file_name))
+        page = do_page(src_dir + download_file_name)
         html_output = page.encode_contents(formatter='html')
-        output_file_name = dst_dir + disease_url + '.html'
+        output_file_name = dst_dir + download_file_name
         print(output_file_name)
 
         output_dir = os.path.dirname(output_file_name)
@@ -56,6 +66,7 @@ def main(argv):
             f.write(html_output)
 
 def do_page(path):
+    global page_links
     with open(path, 'r') as f:
         html = f.read()
 
@@ -76,7 +87,7 @@ def do_page(path):
     main_content = page.find("div", id = 'MainContent').find('div', class_='row') #
     main_content.find('a', class_='anchor-toolkit').parent.parent.decompose() # left nav and body
     main_content.find('a', class_='anchor-toolkit').parent.parent.decompose()
-    listen_list = main_content.find('a', class_='rsbtn_play')
+    #listen_list = main_content.find('a', class_='rsbtn_play')
     for tag in main_content.find_all('a', class_='rsbtn_play'):
         tag.decompose()
 
@@ -87,6 +98,25 @@ def do_page(path):
 
     left_nav_lines = BeautifulSoup(get_left_nav_lines(), 'html.parser')
     left_nav.append(left_nav_lines)
+
+    disease_body = main_content.find('div', id='diseasePageContent')
+    for suggestion in disease_body.select('div[class*="suggestion-"]'):
+        #print (suggestion)
+        suggestion.decompose()
+
+    disease_links = disease_body.find_all('a', href=True)
+    for a in disease_links:
+        link = a['href']
+        if link[0] == '#': # internal
+            continue
+        parsed_link = urlparse(link)
+        if parsed_link.netloc:
+            continue
+        if path in page_links:
+            page_links[path][link] = 'found'
+        else:
+            page_links[path] = {link : 'found'}
+        #print(link)
 
     logo_lines = BeautifulSoup(get_logo_lines(), 'html.parser')
     #main_content.div.insert_before(logo_lines)
@@ -116,6 +146,7 @@ def replace_links(tag, from_link, to_link=None):
         to_link = '..' + from_link
     if to_link[-1] != '/':
         to_link += '/'
+    #  os.path.relpath('/assets','/diseases/7381') gives relative link from 2nd to 1st
     #print('tag before len: ',len(tag))
     #os.path.join(src_dir, filename)
     links = tag.find_all(href=re.compile(from_link))
