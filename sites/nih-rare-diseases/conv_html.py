@@ -6,29 +6,47 @@ import re
 import string
 from urllib.parse import urljoin, urldefrag, urlparse
 from bs4 import BeautifulSoup, Comment, SoupStrainer
-import iiab.adm_lib as adm
+from sp_lib import *
 
 site = 'rarediseases.info.nih.gov'
 
 orig_dir = '/articlelibrary/viewarticle/'
 base_url = 'https://' + site + orig_dir
-src_dir = 'site-download'
+download_dir = 'site-download'
 dst_dir = '/library/www/html/modules/en-nih_rarediseases'
+external_url_not_found = '/not-offline.html'
 
 # read stats
-site_urls = adm.read_json(site + '_urls.json')
-site_redirects = adm.read_json(site + '_redirects.json')
+site_urls = read_json(site + '_urls.json')
+site_redirects = read_json(site + '_redirects.json')
 
-disease_catalog = adm.read_json('disease-catalog.json')
+disease_catalog = read_json('disease-catalog.json')
 
 page_links = {}
 
 def main(argv):
-    convert_diseases()
-    convert_nav()
+    #convert_diseases()
+    #convert_nav()
+    pass
 
 def convert_nav():
-    pass
+    match_prefix = '^https?://rarediseases.info.nih.gov'
+    matches = [match_prefix + '/diseases/categories',
+               match_prefix + '/diseases/browse-by-first-letter']
+    content_type = 'text/html'
+    url_list = filter_urls(site_urls, content_type, matches)
+    for url in url_list:
+        #read_file_name = url_to_file_name(url, content_type)
+        #read_file_path = download_dir + read_file_name
+
+        print('Converting ' + url)
+
+        page, page_file_name = do_nav_page(url, download_dir)
+        html_output = page.encode_contents(formatter='html')
+        output_file_name = dst_dir + page_file_name
+
+        write_html_file(output_file_name, html_output)
+        print(output_file_name)
 
 def convert_diseases():
     # need site_urls for type of image - see below
@@ -53,7 +71,7 @@ def convert_diseases():
         #download_file_name = disease_url[1:].replace('/', '.') + '.html'
         print('Converting ' + download_file_name)
 
-        page = do_page(src_dir + download_file_name)
+        page = do_disease_page(src_dir + download_file_name)
         html_output = page.encode_contents(formatter='html')
         output_file_name = dst_dir + download_file_name
         print(output_file_name)
@@ -65,7 +83,7 @@ def convert_diseases():
         with open(output_file_name, 'wb') as f:
             f.write(html_output)
 
-def do_page(path):
+def do_disease_page(path):
     global page_links
     with open(path, 'r') as f:
         html = f.read()
@@ -85,8 +103,10 @@ def do_page(path):
         comments.extract()
 
     main_content = page.find("div", id = 'MainContent').find('div', class_='row') #
-    main_content.find('a', class_='anchor-toolkit').parent.parent.decompose() # left nav and body
-    main_content.find('a', class_='anchor-toolkit').parent.parent.decompose()
+    toolkit = main_content.find('a', class_='anchor-toolkit')
+    if toolkit:
+        toolkit.parent.parent.decompose() # left nav and body
+    # main_content.find('a', class_='anchor-toolkit').parent.parent.decompose() WHY DOUBLED
     #listen_list = main_content.find('a', class_='rsbtn_play')
     for tag in main_content.find_all('a', class_='rsbtn_play'):
         tag.decompose()
@@ -100,22 +120,23 @@ def do_page(path):
     left_nav.append(left_nav_lines)
 
     disease_body = main_content.find('div', id='diseasePageContent')
-    for suggestion in disease_body.select('div[class*="suggestion-"]'):
-        #print (suggestion)
-        suggestion.decompose()
+    if disease_body:
+        for suggestion in disease_body.select('div[class*="suggestion-"]'):
+            #print (suggestion)
+            suggestion.decompose()
 
-    disease_links = disease_body.find_all('a', href=True)
-    for a in disease_links:
-        link = a['href']
-        if link[0] == '#': # internal
-            continue
-        parsed_link = urlparse(link)
-        if parsed_link.netloc:
-            continue
-        if path in page_links:
-            page_links[path][link] = 'found'
-        else:
-            page_links[path] = {link : 'found'}
+        disease_links = disease_body.find_all('a', href=True)
+        for a in disease_links:
+            link = a['href']
+            if link[0] == '#': # internal
+                continue
+            parsed_link = urlparse(link)
+            if parsed_link.netloc:
+                continue
+            if path in page_links:
+                page_links[path][link] = 'found'
+            else:
+                page_links[path] = {link : 'found'}
         #print(link)
 
     logo_lines = BeautifulSoup(get_logo_lines(), 'html.parser')
@@ -140,6 +161,109 @@ def do_page(path):
     page.body.append(bottom_lines)
 
     return page
+
+def do_nav_page(url, download_dir):
+    content_type = site_urls[url]['content-type']
+    page_file_name = url_to_file_name(url, content_type)
+    input_file_path = download_dir + page_file_name
+
+    with open(input_file_path, 'r') as f:
+        html = f.read()
+
+    page = BeautifulSoup(html, "html5lib")
+    #page = BeautifulSoup(html, "html.parser")
+
+    css_files = page.find_all('link',{'rel':'stylesheet'})
+
+    for link in css_files:
+        link.extract()
+
+    for s in page(["script", "style"]): # remove all javascript and stylesheet code
+        s.extract()
+
+    for comments in page.head.findAll(text=lambda text:isinstance(text, Comment)):
+        comments.extract()
+
+    main_content = page.find("div", id = 'MainContent').find('div', class_='row') #
+    left_nav = main_content.find("div", class_='left-menu').ul
+    # Remove external links from nav
+    left_nav.find('a', string="List of FDA Orphan Drugs").parent.decompose()
+    left_nav.find('a', string="GARD Information Navigator").parent.decompose()
+    left_nav.find('a', string="FAQs About Rare Diseases").parent.decompose()
+
+    logo_lines = BeautifulSoup(get_logo_lines(), 'html.parser')
+    #main_content.div.insert_before(logo_lines)
+
+    page.body.clear()
+    page.body.append(logo_lines)
+    #page.body.append(left_nav)
+    page.body.append(main_content)
+
+
+    # convert picture links
+    #repl_pic_links(page)
+
+    head_lines = BeautifulSoup(get_head_lines(), 'html.parser')
+
+    #print(head_lines)
+    bottom_lines = BeautifulSoup(get_bottom_lines(), 'html.parser')
+    #print(bottom_lines)
+
+    page.head.append(head_lines)
+    page.body.append(bottom_lines)
+
+    page = fix_links(page, url)
+
+    return page, page_file_name
+
+def fix_links(page, page_url):
+    # calculate links relative current page path
+    page_domain = urlparse(page_url).netloc
+    links = page.find_all(['a', 'link'], href=True) # check for both a and link tags
+    for tag in links:
+        href = tag['href']
+        if href[0] == '#': # internal
+            continue
+        parsed_link = urlparse(href)
+        if parsed_link.netloc != '' and parsed_link.netloc != page_domain: # external link
+            href = external_url_not_found
+        else:
+            href_path = convert_link(page_url, href)
+            if not href_path:
+                continue
+            #tag['href'].replace(tag['href'], href_path)
+            tag['href'] = href_path
+
+    elements = page.find_all(['audio', 'embed', 'iframe', 'img', 'input', 'script', 'source', 'track', 'video'])
+    for tag in elements:
+        if tag.has_attr('src'):
+            src_path = convert_link(page_url, tag['src'])
+            tag['src'] = src_path
+        else:
+            continue
+    return page
+
+def convert_link(base_url, href):
+    # check for redirect
+    # get content-type
+    # compute href file name
+    # convert to relative path
+    href_url = urljoin(base_url, href)
+    base_path = url_to_file_name(base_url, 'text/html') # has to be html
+    if href_url in site_redirects:
+        href_url = site_redirects[href_url]
+    if href_url in site_urls:
+        content_type = site_urls[href_url]['content-type']
+        href_path = url_to_file_name(href_url, content_type)
+        href_path = posixpath.relpath(href_path, start=os.path.dirname(base_path))
+        return href_path
+    else:
+        href_path = url_to_file_name(href_url, None) # allow links not in site_urls if have extension
+        if href_path:
+            return posixpath.relpath(href_path, start=os.path.dirname(base_path))
+        else:
+            print('Unknown URL ' + href_url + ' not in site_urls')
+            return None
 
 def replace_links(tag, from_link, to_link=None):
     if not to_link:
@@ -186,6 +310,13 @@ def replace_links(tag, from_link, to_link=None):
     #print('tag after len: ',len(tag))
     return tag
 
+def write_html_file(output_file_name, html_output):
+    output_dir = os.path.dirname(output_file_name)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    with open(output_file_name, 'wb') as f:
+        f.write(html_output)
+
 ######## NOT USED ##################
 def repl_pic_links(page):
     pix_links = page.body.find_all(href=re.compile("/pictures/getimagecontent"))
@@ -220,7 +351,8 @@ def cleanup_url(url): # in future this will be done in spider
 
 def get_head_lines():
     head_lines = '''
-    <link href="../../assets/style.css" rel="stylesheet">
+    <link href="/assets/style.css" rel="stylesheet">
+    <link href="/assets/style-override.css" rel="stylesheet">
     '''
     return head_lines
 
