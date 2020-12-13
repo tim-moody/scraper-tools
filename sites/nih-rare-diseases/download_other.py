@@ -26,6 +26,8 @@ disease_catalog = read_json_file('disease-catalog.json')
 page_links = {}
 
 def main(argv):
+    download_images()
+    download_assets()
     pass
 
 def download_images():

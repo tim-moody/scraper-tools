@@ -25,8 +25,11 @@ disease_catalog = read_json_file('disease-catalog.json')
 page_links = {}
 
 def main(argv):
-    #convert_diseases()
-    #convert_nav()
+    convert_nav()
+    convert_diseases()
+    convert_disease_cases()
+    convert_glossary()
+    convert_glossary_desc()
     pass
 
 def convert_nav():

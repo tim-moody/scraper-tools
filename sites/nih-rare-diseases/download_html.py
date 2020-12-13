@@ -26,9 +26,9 @@ disease_catalog = read_json_file('disease-catalog.json')
 page_links = {}
 
 def main(argv):
-    #download_disease_cases()
-    #download_disease_nav()
-    #download_glossary()
+    download_disease_cases()
+    download_disease_nav()
+    download_glossary()
     pass
 
 def download_disease_cases():
