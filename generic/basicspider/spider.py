@@ -381,6 +381,7 @@ class BasicSpider(object):
             head_response = self.make_head_request(return_url)
             #head_response = requests.head(return_url)
             if head_response:
+                # TODO HANDLE 400 INVALID URL
                 if head_response.status_code >=300 and head_response.status_code < 400: # redirect
                     return_url = head_response.headers['Location']
                     self.global_site_redirects[url] = return_url

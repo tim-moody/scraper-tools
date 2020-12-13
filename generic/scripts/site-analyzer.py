@@ -77,11 +77,18 @@ def sum_content_types():
     for url in site_urls:
         content_type = site_urls[url].get('content-type', None)
         size = int(site_urls[url].get('content-length', 0))
+        parsed_url = urlparse(url)
+        root_path = '/' + parsed_url.path.split('/')[1]
         if content_type not in content_types:
             content_types[content_type] = {'count': 1, 'bytes': size}
+            content_types[content_type]['paths'] = {root_path: 1}
         else:
             content_types[content_type]['count'] += 1
             content_types[content_type]['bytes'] += size
+            if root_path in content_types[content_type]['paths']:
+                content_types[content_type]['paths'][root_path] += 1
+            else:
+                content_types[content_type]['paths'][root_path] = 1
             if content_type == "broken-link":
                 broken_links[url] = "broken-link"
     for content_type in content_types:
@@ -158,6 +165,25 @@ def compare_urls():
             cnt2 += 1
     print ('total urls not in pages: ' + str(cnt))
     print ('total urls not in pages or children: ' + str(cnt2))
+
+def check_url_names():
+    for u in site_urls:
+        if  site_urls[u]["content-type"] == "text/html":
+            continue
+        if  site_urls[u]["content-type"] == "broken-link":
+            continue
+        parsed_url = urlparse(u)
+        path = parsed_url.path
+        query = parsed_url.query
+        if query != '':
+            path += '?' + query
+        try:
+            name = url_to_file_name(u, site_urls[u]["content-type"])
+            if path != name:
+                print(u)
+                print('path: ' + path + ', name: ' + name)
+        except:
+            print('error in url_to_file_name for ' + u)
 
 def calc_page_children():
     global all_pages
