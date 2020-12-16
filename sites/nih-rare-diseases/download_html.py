@@ -26,9 +26,10 @@ disease_catalog = read_json_file('disease-catalog.json')
 page_links = {}
 
 def main(argv):
-    download_disease_cases()
-    download_disease_nav()
-    download_glossary()
+    #download_disease_cases()
+    #download_disease_nav()
+    #download_glossary()
+    #download_espanol()
     pass
 
 def download_disease_cases():
@@ -51,6 +52,14 @@ def download_glossary():
     match_prefix = '^https?://rarediseases.info.nih.gov'
     matches = [match_prefix + '/glossary',
                 match_prefix + '/Glossary']
+    content_type = 'text/html'
+    url_list = filter_urls(site_urls, content_type, matches)
+    download_urls(url_list, content_type, download_dest_dir)
+
+def download_espanol():
+    match_prefix = '^https?://rarediseases.info.nih.gov'
+    matches = [match_prefix + '/espanol',
+                match_prefix + '/glosario']
     content_type = 'text/html'
     url_list = filter_urls(site_urls, content_type, matches)
     download_urls(url_list, content_type, download_dest_dir)

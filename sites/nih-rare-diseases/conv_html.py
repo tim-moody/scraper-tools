@@ -25,11 +25,13 @@ disease_catalog = read_json_file('disease-catalog.json')
 page_links = {}
 
 def main(argv):
-    convert_nav()
-    convert_diseases()
-    convert_disease_cases()
-    convert_glossary()
-    convert_glossary_desc()
+    #convert_nav()
+    #convert_diseases()
+    #convert_disease_cases()
+    #convert_glossary()
+    #convert_glossary_desc()
+    #convert_es_diseases()
+    #convert_es_glossary()
     pass
 
 def convert_nav():
@@ -136,7 +138,55 @@ def convert_glossary_desc():
         write_html_file(output_file_name, html_output)
         print(output_file_name)
 
-def do_disease_page(url, download_dir):
+# Spanish translations
+# diseases are in /espanol/nnnn
+# cases in espanol/nnnn  ... cases/nnnn
+# nav is /espanol/enfermedades (no by category and alpha are sections in enfermidades)
+# glossary in /glosario
+# glossay description in /GlossaryDescription
+
+def convert_es_diseases():
+    match_prefix = '^https?://rarediseases.info.nih.gov'
+    matches = [ # diseases, cases, and nav
+            match_prefix + '/espanol/[0-9]+/[^.]+$',
+            match_prefix + '/espanol/enfermedades'
+            ]
+    content_type = 'text/html'
+    url_list = filter_urls(site_urls, content_type, matches)
+    for url in url_list:
+        if is_page_not_found(url):
+            continue
+        #read_file_name = url_to_file_name(url, content_type)
+        #read_file_path = download_dir + read_file_name
+
+        print('Converting ' + url)
+
+        page, page_file_name = do_disease_page(url, download_dir, lang='es')
+        html_output = page.encode_contents(formatter='html')
+        output_file_name = dst_dir + page_file_name
+
+        write_html_file(output_file_name, html_output)
+        print(output_file_name)
+
+def convert_es_glossary():
+    match_prefix = '^https?://rarediseases.info.nih.gov'
+    matches = [match_prefix + '/glosario']
+    content_type = 'text/html'
+    url_list = filter_urls(site_urls, content_type, matches)
+    for url in url_list:
+        #read_file_name = url_to_file_name(url, content_type)
+        #read_file_path = download_dir + read_file_name
+
+        print('Converting ' + url)
+
+        page, page_file_name = do_disease_page(url, download_dir, lang='es')
+        html_output = page.encode_contents(formatter='html')
+        output_file_name = dst_dir + page_file_name
+
+        write_html_file(output_file_name, html_output)
+        print(output_file_name)
+
+def do_disease_page(url, download_dir, lang='en'):
     content_type = site_urls[url]['content-type']
     page_file_name = url_to_file_name(url, content_type)
     input_file_path = download_dir + page_file_name
@@ -179,7 +229,7 @@ def do_disease_page(url, download_dir):
                 left_nav.clear()
                 left_nav.append(left_toc)
 
-                left_nav_lines = BeautifulSoup(get_left_nav_lines(), 'html.parser')
+                left_nav_lines = BeautifulSoup(get_left_nav_lines(lang), 'html.parser')
                 left_nav.append(left_nav_lines)
         disease_body = main_content.find('div', id='diseasePageContent')
         if disease_body:
@@ -322,7 +372,7 @@ def fix_links(page, page_url):
             tag['href'] = convert_link(page_url, external_url_not_found)
         elif not is_offline_link(href):
             tag['href'] = convert_link(page_url, external_url_not_found)
-        elif is_page_not_found(page_url, href):
+        elif is_page_link_not_found(page_url, href):
             tag['href'] = convert_link(page_url, external_url_not_found)
         else:
             href_path = convert_link(page_url, href)
@@ -355,7 +405,21 @@ def is_offline_link(url):
             return False
     return True
 
-def is_page_not_found(page_url, url): # hard coded list
+def is_page_not_found(page_url): # hard coded list
+    pages_not_found = get_page_not_found_list()
+    if page_url in pages_not_found:
+        return True
+    else:
+        return False
+
+def is_page_link_not_found(page_url, url): # hard coded list
+    pages_not_found = get_page_not_found_list()
+    if urljoin(page_url, url) in pages_not_found:
+        return True
+    else:
+        return False
+
+def get_page_not_found_list():
     pages_not_found = [
         'https://rarediseases.info.nih.gov/diseases/10193/www.uptodate.com/contents/clinical-manifestations-pathologic-features-and-diagnosis-of-subcutaneous-panniculitis-like-t-cell-lymphoma',
         'https://rarediseases.info.nih.gov/diseases/10340/menieres-disease/cases/www.ncbi.nlm.nih.gov/pubmed/17224529',
@@ -374,12 +438,32 @@ def is_page_not_found(page_url, url): # hard coded list
         'https://rarediseases.info.nih.gov/diseases/7182/www.ncbi.nlm.nih.gov/pubmed/30280066',
         'https://rarediseases.info.nih.gov/diseases/7792/tracheoesophegeal fistulawww.nlm.nih.gov/medlineplus/ency/article/002934.htm',
         'https://rarediseases.info.nih.gov/diseases/7792/tracheoesophegeal%20fistulawww.nlm.nih.gov/medlineplus/ency/article/002934.htm',
-        'https://rarediseases.info.nih.gov/organizations/742'
+        'https://rarediseases.info.nih.gov/organizations/742',
+        'https://rarediseases.info.nih.gov/espanol/12418/www.galactosemia.es',
+        'https://rarediseases.info.nih.gov/espanol/13456/www.scleroderma.org',
+        'https://rarediseases.info.nih.gov/espanol/12462/sindrome-de-goldenhar/cases/www.seattlechildrens.org',
+        'https://rarediseases.info.nih.gov/espanol/13037/www.facebook.com',
+        'https://rarediseases.info.nih.gov/espanol/12926/www.scleroderma.org',
+        'https://rarediseases.info.nih.gov/espanol/12374/www.acelaweb.org',
+        'https://rarediseases.info.nih.gov/espanol/12374/www.asociacionela.org.ar',
+        'https://rarediseases.info.nih.gov/espanol/12374/www.asociacionela.org.ar/www.acelaweb.org',
+        'https://rarediseases.info.nih.gov/espanol/12374/www.asociacionela.org.ar/www.asociacionela.org.ar/',
+        'https://rarediseases.info.nih.gov/espanol/12809/www.fenaer.es',
+        'https://rarediseases.info.nih.gov/espanol/12007/www.lls.org',
+        'https://rarediseases.info.nih.gov/espanol/12871/www.laspghan.org',
+        'https://rarediseases.info.nih.gov/espanol/11988/www.scleroderma.org',
+
+        'https://rarediseases.info.nih.gov/espanol/12462/sindrome-de-goldenhar/cases/www.seattlechildrens.org/pdf/PE752S.pdf',
+        'https://rarediseases.info.nih.gov/espanol/12970/3/3/',
+        'https://rarediseases.info.nih.gov/espanol/12970/3/com_contact/Itemid',
+        'https://rarediseases.info.nih.gov/espanol/12970/com_contact/Itemid',
+        'https://rarediseases.info.nih.gov/espanol/13037/www.facebook.com/miasteniarosario',
+        'https://rarediseases.info.nih.gov/organizations/3139',
+        'https://rarediseases.info.nih.gov/organizations/3484',
+        'https://rarediseases.info.nih.gov/organizations/3831'
+
         ]
-    if urljoin(page_url, url) in pages_not_found:
-        return True
-    else:
-        return False
+    return pages_not_found
 
 def convert_link(base_url, href):
     # check for redirect
@@ -479,16 +563,6 @@ def repl_pic_links(page):
         img_url = img_link['src']
         img_link['src'] = img_link['src'].replace(img_url, local_file)
 
-def cleanup_url(url): # in future this will be done in spider
-        """
-        Removes URL fragment that falsely make URLs look diffent.
-        Subclasses can overload this method to perform other URL-normalizations.
-        """
-        url = urldefrag(url)[0]
-        url_parts = urlparse(url)
-        url_parts = url_parts._replace(path=url_parts.path.replace('//','/'))
-        return url_parts.geturl()
-
 def get_head_lines():
     head_lines = '''
     <link href="/assets/style.css" rel="stylesheet">
@@ -505,18 +579,28 @@ def get_logo_lines():
     '''
     return logo_lines
 
-def get_left_nav_lines():
-    left_nav_lines = '''
-    <li class="no-children">
-    <a href="/diseases/browse-by-first-letter">Browse A-Z</a>
-    </li>
-    <li class="no-children">
-    <a href="/diseases/categories">Find Diseases By Category</a>
-    </li>
-    <li class="no-children">
-    <a href="/glossary" target="_self">Browse Glossary A-Z</a>
-    </li>
-    '''
+def get_left_nav_lines(lang):
+    if lang == 'es':
+        left_nav_lines = '''
+        <li class="no-children">
+        <a href="/espanol/enfermedades">Enfermedades</a>
+        </li>
+        <li class="no-children">
+        <a href="/glosario" target="_self">Navigue el Glosario A-Z</a>
+        </li>
+        '''
+    else:
+        left_nav_lines = '''
+        <li class="no-children">
+        <a href="/diseases/browse-by-first-letter">Browse A-Z</a>
+        </li>
+        <li class="no-children">
+        <a href="/diseases/categories">Find Diseases By Category</a>
+        </li>
+        <li class="no-children">
+        <a href="/glossary" target="_self">Browse Glossary A-Z</a>
+        </li>
+        '''
     return left_nav_lines
 
 def get_bottom_lines():

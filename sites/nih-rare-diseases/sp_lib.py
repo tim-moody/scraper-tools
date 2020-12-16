@@ -108,23 +108,29 @@ def abs_to_rel_url(base_url, target_url):
     target='.'+target.path
     return posixpath.relpath(target,start=base_dir)
 
+def anchor_to_span(a_tag, page):
+    new_tag = page.new_tag("span")
+    new_tag.string = a_tag.string
+    # a_tag.replace_with(new_tag)
+    return new_tag
+
 def cleanup_url(url): # in future this will be done in spider
-        """
-        Removes URL fragment that falsely make URLs look diffent.
-        Subclasses can overload this method to perform other URL-normalizations.
-        """
-        url = urldefrag(url)[0]
-        url_parts = urlparse(url)
-        url_parts = url_parts._replace(path=url_parts.path.replace('//','/'))
-        return url_parts.geturl()
+    """
+    Removes URL fragment that falsely make URLs look diffent.
+    Subclasses can overload this method to perform other URL-normalizations.
+    """
+    url = urldefrag(url)[0]
+    url_parts = urlparse(url)
+    url_parts = url_parts._replace(path=url_parts.path.replace('//','/'))
+    return url_parts.geturl()
 
 def download_page(url):
-        response = requests.get(url)
-        if not response:
-            return (None)
-        response.encoding = 'utf-8'  # to avoid guessing logic which has a problem parsing https://learningequality.org/directions/
-        html = response.text
-        return (html)
+    response = requests.get(url)
+    if not response:
+        return (None)
+    response.encoding = 'utf-8'  # to avoid guessing logic which has a problem parsing https://learningequality.org/directions/
+    html = response.text
+    return (html)
 
 def get_page_not_found(site_url):
     test_url = site_url if site_url[-1] == '/' else site_url + '/'
