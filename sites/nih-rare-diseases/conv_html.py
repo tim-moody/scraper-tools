@@ -25,13 +25,13 @@ disease_catalog = read_json_file('disease-catalog.json')
 page_links = {}
 
 def main(argv):
-    #convert_nav()
-    #convert_diseases()
-    #convert_disease_cases()
-    #convert_glossary()
-    #convert_glossary_desc()
-    #convert_es_diseases()
-    #convert_es_glossary()
+    convert_nav()
+    convert_diseases()
+    convert_disease_cases()
+    convert_glossary()
+    convert_glossary_desc()
+    convert_es_diseases()
+    convert_es_glossary()
     pass
 
 def convert_nav():
@@ -113,7 +113,7 @@ def convert_glossary():
 
         print('Converting ' + url)
 
-        page, page_file_name = do_disease_page(url, download_dir)
+        page, page_file_name = do_glosary_page(url, download_dir)
         html_output = page.encode_contents(formatter='html')
         output_file_name = dst_dir + page_file_name
 
@@ -176,10 +176,9 @@ def convert_es_glossary():
     for url in url_list:
         #read_file_name = url_to_file_name(url, content_type)
         #read_file_path = download_dir + read_file_name
-
         print('Converting ' + url)
 
-        page, page_file_name = do_disease_page(url, download_dir, lang='es')
+        page, page_file_name = do_glosary_page(url, download_dir, lang='es')
         html_output = page.encode_contents(formatter='html')
         output_file_name = dst_dir + page_file_name
 
@@ -312,6 +311,16 @@ def do_nav_page(url, download_dir):
 
     return page, page_file_name
 
+def do_glosary_page(url, download_dir, lang='en'):
+    page, page_file_name = do_disease_page(url, download_dir, lang)
+    # remove Feedback
+    a_tags = page.find_all('a')
+    for tag in a_tags:
+        if '/Feedback' in tag['href']:
+            tag.parent.decompose()
+
+    return page, page_file_name
+
 def do_glosary_desc_page(url, download_dir):
     content_type = site_urls[url]['content-type']
     page_file_name = url_to_file_name(url, content_type)
@@ -393,7 +402,7 @@ def fix_links(page, page_url):
 def is_offline_link(url):
     # check if link is part off the scraped site
     pass
-    match_suffixes = ['/guides', '/news', '/organizations', '/pages', '/help', '/tips', '/gard', '/about-gard']
+    match_suffixes = ['/guides', '/news', '/organizations', '/pages', '/help', '/tips', '/gard', '/about-gard', '/diseases/fda-orphan-drugs']
     url_prefix = '^https?://rarediseases.info.nih.gov'
     rel_link_prefix = '^'
     for m in match_suffixes:
@@ -495,74 +504,6 @@ def write_html_file(output_file_name, html_output):
     with open(output_file_name, 'wb') as f:
         f.write(html_output)
 
-######## NOT USED
-def replace_links(tag, from_link, to_link=None):
-    if not to_link:
-        to_link = '..' + from_link
-    if to_link[-1] != '/':
-        to_link += '/'
-    #  os.path.relpath('/assets','/diseases/7381') gives relative link from 2nd to 1st
-    #print('tag before len: ',len(tag))
-    #os.path.join(src_dir, filename)
-    links = tag.find_all(href=re.compile(from_link))
-    for link_tag in links:
-        #print(link_tag)
-        link = link_tag['href']
-        #print(link)
-        # make sure this is one of our target links
-        parsed_link = urlparse(link)
-        if parsed_link.netloc and parsed_link.netloc != site:
-            continue
-        url = urljoin(base_url, link)
-        url = cleanup_url(url) # put url in same format as in json
-
-        content_type = site_urls[url].get('content-type', '')
-        content_type = content_type.strip()
-        if content_type == 'image/jpeg':
-            suffix = 'jpg'
-        else:
-            suffix = content_type.split('/')[1]
-        if link[-1] == '/':
-            link = link[:-1]
-        filename = link.rsplit('/')[-1]
-        if '.' not in filename[:-1]:
-            filename += '.' + suffix
-        if filename[-1] == '.':
-            filename += suffix
-
-        local_file = to_link + filename
-        print(local_file)
-        link_tag['href'] = link_tag['href'].replace(link, local_file)
-        img_link = link_tag.find('img')
-        #print(img_link)
-        if img_link:
-            img_url = img_link['src']
-            img_link['src'] = img_link['src'].replace(img_url, local_file)
-    #print('tag after len: ',len(tag))
-    return tag
-
-######## NOT USED ##################
-def repl_pic_links(page):
-    pix_links = page.body.find_all(href=re.compile("/pictures/getimagecontent"))
-    for pix_link in pix_links:
-        link = pix_link['href']
-        pix_url = 'https://' + site + link
-        content_type = site_urls[pix_url].get('content-type', '')
-        content_type = content_type.strip()
-        if link[-1] == '/':
-            link = link[:-1]
-        filename = link.rsplit('/')[-1]
-        if content_type == 'image/jpeg':
-            filename += '.jpg'
-        else:
-            filename += '.' + content_type.split('/')[1]
-        local_file = '../pictures/' + filename
-        #print(local_file)
-        pix_link['href'] = pix_link['href'].replace(link, local_file)
-        img_link = pix_link.find('img')
-        img_url = img_link['src']
-        img_link['src'] = img_link['src'].replace(img_url, local_file)
-
 def get_head_lines():
     head_lines = '''
     <link href="/assets/style.css" rel="stylesheet">
@@ -573,8 +514,8 @@ def get_head_lines():
 def get_logo_lines():
     logo_lines = '''
     <div>
-    <img class="ncats-logo-image" alt="National Center for Advancing and Translational Sciences" src="../../assets/NCATS_Logo.png">
-    <img class="gard-logo-image" alt="Genetic and Rare Diseases Information Center, a program of the National Center for Advancing and Translational Sciences" src="../../assets/GARD_logo.png">
+    <a href="/diseases/browse-by-first-letter/A/index.html"><img class="ncats-logo-image" alt="National Center for Advancing and Translational Sciences" src="/assets/NCATS_Logo.png"></a>
+    <img class="gard-logo-image" alt="Genetic and Rare Diseases Information Center, a program of the National Center for Advancing and Translational Sciences" src="/assets/GARD_logo.png">
     </div>
     '''
     return logo_lines
