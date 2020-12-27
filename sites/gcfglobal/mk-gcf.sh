@@ -24,9 +24,12 @@ for f in $(cat $WORKDIR/ziplist);do
    fi
 done
 
-# Unzip the content to a place where they can be displayed
-mkdir -p $DISPDIR
+# Establish the directories receive files
+mkdir -p $DISPDIR/scrypts
+mkdir -p $DISPDIR/styles
+mkdir -p $DISPDIR/fonts
 
+# Unzip the content to a place where they can be displayed
 curdir=$(pwd)
 for f in $(cat $WORKDIR/ziplist);do
    basename=$(basename $f)
@@ -44,11 +47,13 @@ cd $curdir
 # So I used a recursive wget -- mostly to get the lay of the land
 GCF_TREE=/library/www/html/modules/oneline
 mkdir -p $GCF_TREE
-if [ ! -f $GCF_TREE/index.html }; then
+if [ ! -f $GCF_TREE/index.html ]; then
    wget -nHc -r -P $GCF_TREE/ -k -K --page-requisites https://edu.gcfglobal.org/
 fi
 /bin/cp -rpf $GCF_TREE/scripts $DISPDIR
-/bin/cp -rpf $GCF_TREE/styles $DISPDIR
+/bin/cp -rpf $GCF_TREE/styles/deployment-en/ $DISPDIR/styles
+
+/bin/cp -rpf $GCF_TREE/styles/deployment-en/index-en.concat.css $DISPDIR/styles/
 /bin/cp -rpf $GCF_TREE/images $DISPDIR
 /bin/cp -rpf $GCF_TREE/en/subjects $DISPDIR/en
 
@@ -82,34 +87,40 @@ done
 # Change the absolute links to relative ones in topics directory
 
 # First operate on the children
-cd $DISPDIR/en/topics
-for f in $(find .|egrep /.+/index.html); do
+cd $DISPDIR/en/
+for f in $(find {subjects,topics}|grep index.html); do
    echo Topics child $f
    sed -i -e's|href="/styles/|href="../../styles/|' $f
    sed -i -e's|src="/scripts/|src=../../scripts/|' $f
    sed -i -e's|src="/images/|src="../../images/|' $f
    sed -i -e's|https://fonts.googleapis.com/css?family=Source+Sans+Pro:200,300,400,600,700|../../styles/source-sans-pro.css|' $f
    sed -i -e's|https://fonts.googleapis.com/icon?family=Material+Icons|../../styles/material-icons.css|' $f
+   sed -i -e's|https://media.gcflearnfree.org/global/gcfglobal-color.png|../../assets/gcfglobal-color.png|' $f
 done
 
-cd $DISPDIR/en/topics
+cd $DISPDIR/en/
 for f in $(find .|grep index.html); do
-   sed -i -e's|/en/|../|' $f
-   sed -i -e's|https://fonts.googleapis.com/css?family=Source+Sans+Pro:200,300,400,600,700|../styles/source-sans-pro.css|' $f
-   sed -i -e's|https://fonts.googleapis.com/icon?family=Material+Icons|../styles/material-icons.css|' $f
+   sed -i -e's|/en/|../../|' $f
+   sed -i -e's|https://fonts.googleapis.com/css?family=Source+Sans+Pro:200,300,400,600,700|../../styles/source-sans-pro.css|' $f
+   sed -i -e's|https://fonts.googleapis.com/icon?family=Material+Icons|../../styles/material-icons.css|' $f
+   sed -i -e's|https://media.gcflearnfree.org/global/gcfglobal-color.png|../../assets/gcfglobal-color.png|' $f
 done
 
 cd $curdir
 # copy in my own hand crafted landing page -- extracted from header dropdown
 /bin/cp -rpf homepage.index.html $DISPDIR/index.html
+
 # We need a nice logo on our landing page
-/bin/cp -rpf gcfglobal-color.png $DISPDIR/images/gcfglobal-color.png
+mkdir -p $DISPDIR/assets
+/bin/cp -rpf assets/* $DISPDIR/assets/
+/bin/cp -rpf scripts/* $DISPDIR/scripts/
+/bin/cp -rpf styles/* $DISPDIR/styles/
 
 # update the main index.html to be relative links
    sed -i -e's|href="/styles/|href="./styles/|' $DISPDIR/index.html
    sed -i -e's|src="/images/|src="./images/|' $DISPDIR/index.html
    sed -i -e's|src="/scripts/|src="./scripts/|' $DISPDIR/index.html
    sed -i -e's|href="/en/|href="./en/|' $DISPDIR/index.html
-   sed -i -e's|https://media.gcflearnfree.org/global/gcfglobal-color.png|./images/gcfglobal-color.png|' $DISPDIR/index.html
-   sed -i -e's|https://media.gcflearnfree.org/assets/logo/logo.png|./images/gcfglobal-color.png|' $DISPDIR/index.html
+   sed -i -e's|https://media.gcflearnfree.org/global/gcfglobal-color.png|./assets/gcfglobal-color.png|' $DISPDIR/index.html
+   sed -i -e's|https://media.gcflearnfree.org/assets/logo/logo.png|./assets/logo.png|' $DISPDIR/index.html
 
