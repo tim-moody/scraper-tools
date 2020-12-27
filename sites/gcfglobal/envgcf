@@ -1,0 +1,4 @@
+alias prog='pushd /library/www/html/gjh/scraper-tools/sites/gcfglobal'
+alias gcf='pushd /library/www/html/modules/en-GCF2020'
+alias mod='pushd /library/www/html/modules'
+alias wor='pushd /library/working/rachel/gcf'
