@@ -53,7 +53,7 @@ fi
 /bin/cp -rpf $GCF_TREE/scripts $DISPDIR
 /bin/cp -rpf $GCF_TREE/styles/deployment-en/ $DISPDIR/styles
 
-/bin/cp -rpf $GCF_TREE/styles/deployment-en/index-en.concat.css $DISPDIR/styles/
+/bin/cp -rpf $GCF_TREE/styles/deployment-en/* $DISPDIR/styles/
 /bin/cp -rpf $GCF_TREE/images $DISPDIR
 /bin/cp -rpf $GCF_TREE/en/subjects $DISPDIR/en
 
