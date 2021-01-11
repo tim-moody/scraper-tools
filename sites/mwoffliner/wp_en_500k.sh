@@ -7,15 +7,17 @@
 # docker inspect -f '{{.State.Pid}}' mwoffliner_wikipedia_en_top_500k
 # grep VmPeak /proc/<pid>/status # is this swap?
 
+. env.sh
 docker run -v /zim-output:/output:rw \
 --name mwoffliner_wikipedia_en_top_500k \
 --detach --cpu-shares 3072 --memory-swappiness 0 \
---memory 8g openzim/mwoffliner:1.11.2 mwoffliner \
+--memory 8g openzim/mwoffliner:$MWOFFLINERV mwoffliner \
 --adminEmail="info@iiab.me" \
 --articleList="http://download.openzim.org/wp1/enwiki/tops/500000.tsv" \
 --customZimDescription="Top five hundred thousand Wikipedia articles" \
 --customZimFavicon="https://en.wikipedia.org/static/images/project-logos/enwiki.png" \
 --customZimTitle="Wikipedia Top 500K" --filenamePrefix="wikipedia_en_top_500k" \
+--optimisationCacheUrl=$S3URL \
 --format="novid:maxi" \
 --mwUrl="https://en.wikipedia.org/" \
 --osTmpDir="/dev/shm" --outputDirectory="/output" --zstd --webp
