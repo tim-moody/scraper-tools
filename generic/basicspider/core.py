@@ -62,38 +62,6 @@ class SpiderCore(object):
                 return path
         return url
 
-
-    def should_ignore_url(self, url): # use should_include_url in sp_lib
-        """
-        Returns True if `url` matches any of the IGNORE_URL criteria.
-        """
-        url = self.cleanup_url(url)
-
-        # 1. run through ignore lists
-        combined_ignore_patterns = self.BASE_IGNORE_URLS.copy()
-        combined_ignore_patterns.extend(self.IGNORE_URLS)
-        for pattern in combined_ignore_patterns:
-            if isinstance(pattern, str):
-                if url == pattern:
-                    return True
-            elif isinstance(pattern, Pattern):
-                if pattern.match(url):
-                    return True
-            elif callable(pattern):
-                if pattern(url):
-                    return True
-            else:
-                raise ValueError('Unrecognized pattern in IGNORE_URLS. Use strings, REs, or callables.')
-
-        # 2. check if url is on one of the specified source domains
-        found = False
-        parsedurl = urlparse(url)
-        for source_domain in self.SOURCE_DOMAINS:
-            parsedomain = urlparse(source_domain)
-            if parsedurl.netloc == parsedomain.netloc:
-                found = True
-        return not found     # should ignore if not found in SOURCE_DOMAINS list
-
     def pre_crawl_setup(self):
         #self.queue = queue.Queue()
 

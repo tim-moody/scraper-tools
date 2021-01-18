@@ -40,9 +40,8 @@ class BasicSpider(SpiderCore):
 
     # Subclass attributes
     MAIN_SOURCE_DOMAIN = None   # should be defined by subclass
-    SOURCE_DOMAINS = []         # should be defined by subclass
+    #SOURCE_DOMAINS = []         # should be defined by subclass
     START_PAGE = None           # should be defined by subclass
-    START_PAGE_CONTEXT = {}     # should be defined by subclass
     REFRESH_HTML = False
     HTML_INCL_PATTERNS = []
     HTML_EXCL_PATTERNS = []
@@ -65,8 +64,8 @@ class BasicSpider(SpiderCore):
         if self.MAIN_SOURCE_DOMAIN is None:
             parsedurl = urlparse(start_page)
             self.MAIN_SOURCE_DOMAIN = parsedurl.scheme + '://' + parsedurl.netloc
-        if self.MAIN_SOURCE_DOMAIN not in self.SOURCE_DOMAINS:
-            self.SOURCE_DOMAINS.append(self.MAIN_SOURCE_DOMAIN)
+        if self.MAIN_SOURCE_DOMAIN:
+            self.HTML_INCL_PATTERNS.append(self.MAIN_SOURCE_DOMAIN)
         if start_page:
             self.START_PAGE = start_page
 
@@ -75,17 +74,15 @@ class BasicSpider(SpiderCore):
         is_new_url, content_type, content_length, return_url = self.get_url_type(self.START_PAGE)
         if content_type == 'text/html':
             self.START_PAGE = return_url
-            self.HTML_INCL_PATTERNS.extend(source_domain_to_regex(self.SOURCE_DOMAINS))
+            #self.HTML_INCL_PATTERNS.extend(source_domain_to_regex(self.SOURCE_DOMAINS))
         else:
             raise ValueError('The Starting URL ' + self.START_PAGE + ' did not return any html.')
 
     def add_incl_patterns(self, pattern_list):
-        comp_pattern_list = compile_regex_list(pattern_list)
-        self.HTML_INCL_PATTERNS.extend(comp_pattern_list)
+        self.HTML_INCL_PATTERNS += list(set(pattern_list) - set(self.HTML_INCL_PATTERNS))
 
     def add_excl_patterns(self, pattern_list):
-        comp_pattern_list = compile_regex_list(pattern_list)
-        self.HTML_EXCL_PATTERNS.extend(comp_pattern_list)
+        self.HTML_EXCL_PATTERNS += list(set(pattern_list) - set(self.HTML_EXCL_PATTERNS))
 
     # MAIN LOOP
     ############################################################################
@@ -109,14 +106,6 @@ class BasicSpider(SpiderCore):
                 LOGGER.warning('GET ' + original_url + ' did not return page.')
                 self.site_error_urls[original_url] = '???'
                 continue
-
-            # record page URL as visited
-            self.urls_visited[original_url] = 'visited'
-
-            # ************ TODO REMOVE **************
-            # annotate context to keep track of URL befor redirects
-            #if url != original_url:
-            #    context['original_url'] = original_url
 
             self.do_one_page(url, html)
 
@@ -173,13 +162,9 @@ class BasicSpider(SpiderCore):
         for i, link_url in enumerate(children):
             link_url = self.cleanup_url(link_url) # This is the main place new urls arise
             LOGGER.debug('link_url: ' + link_url)
-            if self.should_ignore_url(link_url): # these are things like # and javascript:void(0)
+            if should_ignore_link(link_url, self.IGNORE_LINKS): # these are things like # and javascript:void(0)
                 self.site_ignored_urls[link_url] = url
                 continue
-                # Uncomment three lines below for debugging to record ignored links
-                # ignored_rsrc_dict = self.create_ignored_url_dict(link_url)
-                # ignored_rsrc_dict['parent'] = page_dict
-                # page_dict['children'].append(page_dict)
             else:
                 is_new_url, content_type, content_length, real_url = self.get_url_type(link_url)
                 if link_url not in dedup_children:
