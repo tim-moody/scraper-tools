@@ -91,7 +91,7 @@ class SpiderCore(object):
 
 
     def post_crawl_output(self):
-        self.write_site_json(self, self.OUTPUT_FILE_PREFIX)
+        self.write_site_json(self.OUTPUT_FILE_PREFIX)
 
     # KEYBOARD CAPTURE
     ############################################################################

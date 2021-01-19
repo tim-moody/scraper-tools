@@ -170,7 +170,7 @@ class BasicSpider(SpiderCore):
                 if link_url not in dedup_children:
                     dedup_children.append(link_url) # handle any redirects
                     if content_type == 'text/html': # it's html so queue it for parsing if not in queue
-                        if not should_include_url(url, self.HTML_INCL_PATTERNS, self.HTML_EXCL_PATTERNS):
+                        if not should_include_url(link_url, self.HTML_INCL_PATTERNS, self.HTML_EXCL_PATTERNS):
                             continue
 
                         if self.SHORTEN_CRAWL: # don't revisit pages for statistical purposes
