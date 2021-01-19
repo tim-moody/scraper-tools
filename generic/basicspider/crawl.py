@@ -160,7 +160,7 @@ class BasicSpider(SpiderCore):
 
         dedup_children = []
         for i, link_url in enumerate(children):
-            link_url = self.cleanup_url(link_url) # This is the main place new urls arise
+            link_url = cleanup_url(link_url) # This is the main place new urls arise
             LOGGER.debug('link_url: ' + link_url)
             if should_ignore_link(link_url, self.IGNORE_LINKS): # these are things like # and javascript:void(0)
                 self.site_ignored_urls[link_url] = url
@@ -197,27 +197,6 @@ class BasicSpider(SpiderCore):
 
     # GENERIC URL HELPERS
     ############################################################################
-
-    def cleanup_url(self, url):
-        """
-        Removes URL fragment that falsely make URLs look diffent.
-        Subclasses can overload this method to perform other URL-normalizations.
-        """
-        url = urldefrag(url)[0]
-        url_parts = urlparse(url)
-        url_parts = url_parts._replace(path=url_parts.path.replace('//','/'))
-        return url_parts.geturl()
-
-    def url_to_path(self, url):
-        """
-        Remove any of the SOURCE_DOMAINS from url if it starts with one of them.
-        """
-        for source_domain in self.SOURCE_DOMAINS:
-            if url.startswith(source_domain):
-                path = url.replace(source_domain, '')
-                return path
-        return url
-
     def get_url_type(self, url):
         """
         Makes a HEAD request for `url` and reuturns (vertict, head_response),
@@ -272,19 +251,13 @@ class BasicSpider(SpiderCore):
         if retries == 0:
             content_type = 'broken-link'
         content_type = content_type.split(';')[0] # remove char format
-        return_url = self.cleanup_url(return_url)
+        return_url = cleanup_url(return_url)
 
         return (is_new_url, content_type, content_length, return_url)
 
 
     # CRAWLING TASK QUEUE API
     ############################################################################
-    #
-    # queue tasks are tuples (url, context) where
-    #  - url (str): which page should be visited
-    #  - context (dict): generic container for data associated with url, notably
-    #     - `context['parent']` is the web resources dict of the referring page
-    #     - `context['kind']` can be used to assign a custom handler, e.g., on_course
 
     def queue_is_empty(self):
         return self.queue.empty()
@@ -294,7 +267,7 @@ class BasicSpider(SpiderCore):
         # TODO(ivan): clarify crawl-only-once logic and use of force flag in docs
         # we are only crawling pages
         # other urls are handled in on_page
-        url = self.cleanup_url(url)
+        url = cleanup_url(url)
         if url not in self.site_pages or force:
             LOGGER.debug('adding to queue:  url=' + url)
             self.queue.put((url, ''))

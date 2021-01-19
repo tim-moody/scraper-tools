@@ -38,30 +38,6 @@ class SpiderCore(object):
         if load_data:
             self.read_site_json(prefix)
 
-
-    # GENERIC URL HELPERS
-    ############################################################################
-
-    def cleanup_url(self, url):
-        """
-        Removes URL fragment that falsely make URLs look diffent.
-        Subclasses can overload this method to perform other URL-normalizations.
-        """
-        url = urldefrag(url)[0]
-        url_parts = urlparse(url)
-        url_parts = url_parts._replace(path=url_parts.path.replace('//','/'))
-        return url_parts.geturl()
-
-    def url_to_path(self, url): # use url_to_file_name in sp_lib
-        """
-        Remove any of the SOURCE_DOMAINS from url if it starts with one of them.
-        """
-        for source_domain in self.SOURCE_DOMAINS:
-            if url.startswith(source_domain):
-                path = url.replace(source_domain, '')
-                return path
-        return url
-
     def pre_crawl_setup(self):
         #self.queue = queue.Queue()
 
