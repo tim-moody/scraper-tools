@@ -5,7 +5,7 @@
 import os,string, sys
 import json
 import requests
-import iiab.adm_lib as adm
+from basicspider.sp_lib import *
 
 
 site_urls = {}

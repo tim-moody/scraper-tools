@@ -27,6 +27,9 @@ class SpiderCore(object):
     OUTPUT_FILE_PREFIX = 'site'
     DOWNLOAD_DEST_DIR = 'site-download/'
 
+    HTML_INCL_PATTERNS = []
+    HTML_EXCL_PATTERNS = []
+
     # saved data structures
     site_pages = {} # DB of all pages that have ever been parsed
     site_urls = {} # DB of all urls that have ever been seen
@@ -37,6 +40,12 @@ class SpiderCore(object):
     def __init__(self, prefix=OUTPUT_FILE_PREFIX, load_data=True):
         if load_data:
             self.read_site_json(prefix)
+
+    def add_incl_patterns(self, pattern_list):
+        self.HTML_INCL_PATTERNS += list(set(pattern_list) - set(self.HTML_INCL_PATTERNS))
+
+    def add_excl_patterns(self, pattern_list):
+        self.HTML_EXCL_PATTERNS += list(set(pattern_list) - set(self.HTML_EXCL_PATTERNS))
 
     def pre_crawl_setup(self):
         #self.queue = queue.Queue()

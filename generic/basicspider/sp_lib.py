@@ -244,6 +244,7 @@ def read_json_file(file_path):
             json_dict = json.loads(readstr)
         return json_dict
     except OSError as e:
+        print('Unable to read url json file', e)
         raise
 
 def write_json_file(src_dict, target_file, sort_keys=False):
@@ -253,3 +254,22 @@ def write_json_file(src_dict, target_file, sort_keys=False):
             json_file.write("\n")  # Add newline cause Py JSON does not
     except OSError as e:
         raise
+
+def print_json(self, inp_dict):
+    json_formatted_str = json.dumps(inp_dict, indent=2)
+    print(json_formatted_str)
+
+def human_readable(num):
+    '''Convert a number to a human readable string'''
+    # return 3 significant digits and unit specifier
+    # TFM 7/15/2019 change to factor of 1024, not 1000 to match similar calcs elsewhere
+    num = float(num)
+    units = ['', 'K', 'M', 'G']
+    for i in range(4):
+        if num < 10.0:
+            return "%.2f%s"%(num, units[i])
+        if num < 100.0:
+            return "%.1f%s"%(num, units[i])
+        if num < 1000.0:
+            return "%.0f%s"%(num, units[i])
+        num /= 1024.0

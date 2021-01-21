@@ -43,8 +43,6 @@ class BasicSpider(SpiderCore):
     #SOURCE_DOMAINS = []         # should be defined by subclass
     START_PAGE = None           # should be defined by subclass
     REFRESH_HTML = False
-    HTML_INCL_PATTERNS = []
-    HTML_EXCL_PATTERNS = []
 
     OUTPUT_FILE_PREFIX = 'site'
     SESSION = requests.Session()
@@ -77,12 +75,6 @@ class BasicSpider(SpiderCore):
             #self.HTML_INCL_PATTERNS.extend(source_domain_to_regex(self.SOURCE_DOMAINS))
         else:
             raise ValueError('The Starting URL ' + self.START_PAGE + ' did not return any html.')
-
-    def add_incl_patterns(self, pattern_list):
-        self.HTML_INCL_PATTERNS += list(set(pattern_list) - set(self.HTML_INCL_PATTERNS))
-
-    def add_excl_patterns(self, pattern_list):
-        self.HTML_EXCL_PATTERNS += list(set(pattern_list) - set(self.HTML_EXCL_PATTERNS))
 
     # MAIN LOOP
     ############################################################################
