@@ -1,5 +1,18 @@
 from urllib.parse import urljoin, urldefrag, urlparse
+import queue
+import collections
 from basicspider.sp_lib import *
+
+# URL QUEUE
+################################################################################
+
+class UrlQueue(queue.Queue):
+    def _init(self, maxsize):
+        self.queue = collections.OrderedSet()
+    def _put(self, item):
+        self.queue.add(item)
+    def _get(self):
+        return self.queue.pop()
 
 # SPIDER CORE
 ################################################################################

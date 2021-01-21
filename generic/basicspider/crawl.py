@@ -12,13 +12,12 @@ import json
 import logging
 import re
 import os
-import queue
 import requests
 import time
 import threading
 from urllib.parse import urljoin, urldefrag, urlparse
 from youtube_dl.utils import std_headers
-from basicspider.core import SpiderCore
+from basicspider.core import UrlQueue, SpiderCore
 from basicspider.sp_lib import *
 
 # BASIC SPIDER
@@ -81,7 +80,7 @@ class BasicSpider(SpiderCore):
 
     def crawl(self, limit=1000, devmode=True):
         # initialize or reset crawler state
-        self.queue = queue.Queue()
+        self.queue = UrlQueue()
         start_url = self.START_PAGE
         self.enqueue_url(start_url)
 
