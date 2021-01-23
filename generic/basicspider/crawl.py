@@ -67,6 +67,8 @@ class BasicSpider(SpiderCore):
         if start_page:
             self.START_PAGE = start_page
 
+        self.load_data = load_data
+
         # make resolve any redirects
         #verdict, head_response = self.is_html_file(self.START_PAGE)
         is_new_url, content_type, content_length, return_url = self.get_url_type(self.START_PAGE)
@@ -84,6 +86,10 @@ class BasicSpider(SpiderCore):
         self.queue = queue.Queue()
         start_url = self.START_PAGE
         self.enqueue_url(start_url)
+
+        # reload processing queue
+        if self.load_data:
+            self.enqueue_all_site_urls(start_url)
 
         threading.Thread(target=self.key_capture_thread, args=(), name='key_capture_thread', daemon=True).start()
         print('Press the ENTER key to terminate')
@@ -221,7 +227,7 @@ class BasicSpider(SpiderCore):
             if head_response:
                 # TODO HANDLE 400 INVALID URL
                 if head_response.status_code >=300 and head_response.status_code < 400: # redirect
-                    return_url = head_response.headers['Location']
+                    return_url = urljoin(url, head_response.headers['Location'])
                     self.site_redirects[url] = return_url
                     LOGGER.warning('Found redirect for url = ' + url + ' = ' + return_url)
                     retries -= 1
@@ -266,6 +272,14 @@ class BasicSpider(SpiderCore):
         else:
             LOGGER.debug('Not going to crawl url ' + url + ' because previously seen.')
             pass
+
+    def enqueue_all_site_urls(self, start_url):
+        for url in self.site_urls:
+            if url == start_url:
+                continue
+            content_type = self.site_urls[url]. get('content-type', '')
+            if content_type == 'text/html':
+                self.enqueue_url(url)
 
     def get_page(self, url, *args, **kwargs):
         return_url = url
@@ -329,11 +343,13 @@ class BasicSpider(SpiderCore):
         """
         Failure-resistant HTTP GET/HEAD request helper method.
         """
+        # head can fail where get succeeds
+        # we could do a get in that case after retries exhausted
         retry_count = 0
-        max_retries = 10
+        max_retries = 5
         while True:
             try:
-                response = self.SESSION.head(url)
+                response = self.SESSION.head(url, timeout=2)
                 break
             except (requests.exceptions.ConnectionError, requests.exceptions.ReadTimeout) as e:
                 retry_count += 1
@@ -342,11 +358,13 @@ class BasicSpider(SpiderCore):
                 time.sleep(retry_count * 1)
                 if retry_count >= max_retries:
                     LOGGER.error("FAILED TO RETRIEVE:" + str(url))
-                    return None
+                    response = None
+                    break
             except Exception as e:
                 LOGGER.error("FAILED TO RETRIEVE:" + str(url))
                 LOGGER.error("GOT ERROR: " + str(e))
-                return None
+                response = None
+                break
         return response
 
     # TEXT HELPERS
