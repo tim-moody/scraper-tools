@@ -227,11 +227,16 @@ class BasicSpider(SpiderCore):
             if head_response:
                 # TODO HANDLE 400 INVALID URL
                 if head_response.status_code >=300 and head_response.status_code < 400: # redirect
-                    return_url = urljoin(url, head_response.headers['Location'])
-                    self.site_redirects[url] = return_url
-                    LOGGER.warning('Found redirect for url = ' + url + ' = ' + return_url)
-                    retries -= 1
-                    continue
+                    if 'Location' in head_response.headers:
+                        return_url = urljoin(url, head_response.headers['Location'])
+                        self.site_redirects[url] = return_url
+                        LOGGER.warning('Found redirect for url = ' + url + ' = ' + return_url)
+                        retries -= 1
+                        continue
+                    else:
+                        LOGGER.warning('HEAD request status in 300s without Location for url ' + url)
+                        content_type = 'broken-link'
+                        break
                 content_type = head_response.headers.get('Content-Type', None)
                 if not content_type:
                     LOGGER.warning('HEAD response does not have `Content-Type` header. url = ' + url)

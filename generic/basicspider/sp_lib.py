@@ -255,7 +255,7 @@ def write_json_file(src_dict, target_file, sort_keys=False):
     except OSError as e:
         raise
 
-def print_json(self, inp_dict):
+def print_json(inp_dict):
     json_formatted_str = json.dumps(inp_dict, indent=2)
     print(json_formatted_str)
 
