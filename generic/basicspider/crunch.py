@@ -50,7 +50,7 @@ class SpiderCrunch(SpiderCore):
         #recursive_visit_extract_urls(channel_dict)
         self.image_urls = self.calc_image_sources()
 
-        write_json_file(cr.content_types, 'site_content_types.json')
+        write_json_file(self.content_types, 'site_content_types.json')
 
         for content_type in self.content_types:
             print (content_type, self.content_types[content_type]['count'], human_readable(self.content_types[content_type]['bytes']))

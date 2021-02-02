@@ -17,6 +17,7 @@ pip3 install youtube_dl
 * crawl.py - Class for spidering a target site
 * crunch.py - Class for analyzing crawl data
 * scripts/crawler.py - template for spidering site
+* scripts/cruncher.py - template for analyzing site
 
 ## BasicSpider Algorithm
 
@@ -58,8 +59,8 @@ These are things like 'javascript:void(0)' which will be ignored without any req
 
 ### Url Patterns to Include
 
-These are a list of regular expressions in HTML_INCL_PATTERNS. Any url that returns html is matched against these patterns and if there is a match it is queued for parsing.
+These are a list of strings or compiled regular expressions in HTML_INCL_PATTERNS. Any url that returns html is matched against these patterns and if there is a match it is queued for parsing. Strings match to the first part of the url.
 
 ### Url Patterns to Exclude
 
-These are a list of regular expressions in HTML_EXCL_PATTERNS. Any url that returns html is matched against these patterns and if there is a match it is not queued for parsing.
+These are a list of strings or compiled regular expressions in HTML_EXCL_PATTERNS. Any url that returns html is matched against these patterns and if there is a match it is not queued for parsing. Strings match to the first part of the url.

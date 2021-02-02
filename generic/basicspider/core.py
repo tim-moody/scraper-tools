@@ -47,6 +47,17 @@ class SpiderCore(object):
     def add_excl_patterns(self, pattern_list):
         self.HTML_EXCL_PATTERNS += list(set(pattern_list) - set(self.HTML_EXCL_PATTERNS))
 
+    def print_site_page(self, url, error_only=False):
+        print(url)
+        page = self.site_pages.get(url, {})
+        for u in page['children']:
+            child = self.site_urls.get(u, {})
+            contyp = child.get('content-type', None)
+            if not contyp:
+                print(u, 'No Content Type Found')
+            elif not error_only:
+                print(u, contyp)
+
     def pre_crawl_setup(self):
         #self.queue = queue.Queue()
 
