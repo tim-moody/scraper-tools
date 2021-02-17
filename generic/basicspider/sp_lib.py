@@ -169,6 +169,8 @@ def url_to_file_name(url, content_type, url_map=None, incl_netloc=True):
             path = path[:-1]
         if content_type == 'image/jpeg':
             ext = '.jpg'
+        elif content_type == 'image/svg+xml':
+            ext = '.svg'
         elif content_type in ['text/javascript', 'application/javascript']:
             ext = '.js'
         elif '/' in content_type: # skip our pseudo content types like broken-link

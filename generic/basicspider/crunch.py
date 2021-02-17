@@ -67,6 +67,7 @@ class SpiderCrunch(SpiderCore):
                 root_path = '/' + parsed_url.path.split('/')[1]
             else:
                 root_path = '/'
+            root_path = parsed_url.netloc + root_path
             if content_type not in self.content_types:
                 self.content_types[content_type] = {'count': 1, 'bytes': size}
                 self.content_types[content_type]['paths'] = {root_path: 1}
