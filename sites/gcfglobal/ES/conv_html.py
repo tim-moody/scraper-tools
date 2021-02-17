@@ -52,7 +52,14 @@ def get_topic_list(index_url):
     return topic_list
 
 def get_lesson_list(topic_url):
-    return ['https://edu.gcfglobal.org/es/como-usar-whatsapp/como-instalar-y-crear-una-cuenta-en-whatsapp-/1/']
+    lesson_list = []
+    page, page_file_name = get_page(topic_url)
+    main_content = page.find("div", id = 'content-area')
+    for lesson in main_content.find_all('div', class_ = 'tutorial-info'):
+        lesson_url = urljoin(topic_url, lesson.a['href'])
+        lesson_list.append(lesson_url)
+    return lesson_list
+    #return ['https://edu.gcfglobal.org/es/como-usar-whatsapp/como-instalar-y-crear-una-cuenta-en-whatsapp-/1/']
 
 def convert_page(url, page_type):
     print('Converting ' + url)
@@ -118,6 +125,56 @@ def do_lesson_page(url, page):
 
     page.body.clear()
     page.body.append(logo_lines)
+    #page.body.append(left_nav)
+    page.body.append(main_content)
+
+    head_lines = BeautifulSoup(get_head_lines(), 'html.parser')
+
+    #print(head_lines)
+    bottom_lines = BeautifulSoup(get_bottom_lines(), 'html.parser')
+    #print(bottom_lines)
+
+    page.head.append(head_lines)
+    page.body.append(bottom_lines)
+
+    page = fix_links(page, url)
+
+    return page
+
+def do_lesson_page_min(url, page):
+    css_files = page.find_all('link',{'rel':'stylesheet'})
+
+    for link in css_files:
+        link.extract()
+
+    for s in page(["script", "style"]): # remove all javascript and stylesheet code
+        s.extract()
+
+    for comments in page.head.findAll(text=lambda text:isinstance(text, Comment)):
+        comments.extract()
+
+    #for tag in page.find_all('iframe'):
+    #    tag.decompose()
+
+    #main_content = page.find("div", id = 'background')
+    main_content = page.find("div", id = 'background')
+
+    main_content.find_all("div", class_ = 'infinite-nav')[0].decompose()
+
+
+    # wes4BlAXgzg
+    # u_0Ns6paWQE
+
+    video_blocks =  main_content.find_all("div", class_ = 'video-embed')
+    for video_block in video_blocks:
+        new_embed = get_video_block(video_block)
+        video_block.iframe.replace_with(new_embed)
+
+    logo_lines = BeautifulSoup(get_logo_lines(), 'html.parser')
+    #main_content.div.insert_before(logo_lines)
+
+    page.body.clear()
+    #page.body.append(logo_lines)
     #page.body.append(left_nav)
     page.body.append(main_content)
 
@@ -252,6 +309,7 @@ def get_head_lines():
     head_lines = '''
     <link rel="stylesheet" href="/styles/deployment-es/lessonpage-es.concat.css">
     '''
+    # <script defer src="/scripts/deployment-es/tutorial.concat.js" type="text/javascript"></script> no help
     return head_lines
 
 def get_logo_lines():
