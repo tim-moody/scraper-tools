@@ -6,6 +6,8 @@ import requests
 import shutil
 import posixpath
 import uuid
+import shlex
+import subprocess
 from urllib.parse import urljoin, urldefrag, urlparse
 
 def download_urls(url_list, content_type, dest_dir, refresh=False):
@@ -275,3 +277,12 @@ def human_readable(num):
         if num < 1000.0:
             return "%.0f%s"%(num, units[i])
         num /= 1024.0
+
+def subproc_run(cmdstr, shell=False, check=False):
+    args = shlex.split(cmdstr)
+    try:
+        compl_proc = subprocess.run(args, shell=shell, check=check,
+                                    universal_newlines=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    except:
+        raise
+    return compl_proc
