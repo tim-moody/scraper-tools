@@ -31,6 +31,8 @@ page_links = {}
 # for test
 url = 'https://edu.gcfglobal.org/es/como-usar-whatsapp/como-instalar-y-crear-una-cuenta-en-whatsapp-/1/'
 url2 = 'https://edu.gcfglobal.org/es/como-usar-windows-10/que-es-el-area-de-notificaciones-de-windows-10/1/'
+url3 = 'https://edu.gcfglobal.org/es/excel-2016/como-crear-un-nuevo-archivo-en-excel-2016/1/'
+url4 = 'https://edu.gcfglobal.org/es/seguridad-en-internet/'
 
 def main(args):
     global DOWNLOAD_ASSETS
@@ -59,31 +61,32 @@ def get_topic_list(index_url):
     #return ['https://edu.gcfglobal.org/es/como-usar-whatsapp/']
     return topic_list
 
-def get_lesson_list(topic_url):
-    lesson_list = []
-    page, page_file_name = get_page(topic_url)
-    main_content = page.find("div", id = 'content-area')
-    for lesson in main_content.find_all('div', class_ = 'tutorial-info'):
+def do_course(course_index):
+    # process index
+    # get lesson list
+    # process each lesson
+
+    page, page_file_name = get_page(course_index)
+
+    course_section = page.find("div", id = 'content-area')
+    for lesson in course_section.find_all('li'):
         lesson_url = urljoin(topic_url, lesson.a['href'])
-        lesson_list.append(lesson_url)
-    return lesson_list
-    #return ['https://edu.gcfglobal.org/es/como-usar-whatsapp/como-instalar-y-crear-una-cuenta-en-whatsapp-/1/']
+        convert_page(lesson_url, 'lesson')
+
+    page = do_course_index_page(course_index, page)
+    output_converted_page(page, page_file_name)
 
 def convert_page(url, page_type):
     print('Converting ' + url)
 
     page, page_file_name = get_page(url)
 
-    if page_type == 'topic':
-        page = do_topic_page(url, page)
+    if page_type == 'course':
+        page = do_course_index_page(url, page)
     if page_type == 'lesson':
         page = do_lesson_page(url, page)
 
-    html_output = page.encode_contents(formatter='html')
-    output_file_name = dst_dir + page_file_name
-
-    write_html_file(output_file_name, html_output)
-    print(output_file_name)
+    output_converted_page(page, page_file_name)
 
 def get_page(url):
     content_type = site_urls[url]['content-type']
@@ -95,24 +98,35 @@ def get_page(url):
     page = BeautifulSoup(html, "html5lib")
     return page, page_file_name
 
-def do_topic_page(url, page):
-    pass
+def output_converted_page(page, page_file_name):
+    html_output = page.encode_contents(formatter='html')
+    output_file_name = dst_dir + page_file_name
+
+    write_html_file(output_file_name, html_output)
+    print(output_file_name)
+
+def do_course_index_page(url, page):
+    page = scrub_header(page)
+
+    main_content = page.find("div", id = 'content-area')
+    main_content['style'] = "width:960px; margin: 0 auto;" # because wrappers not included
+
+    logo_lines = BeautifulSoup(get_logo_lines(), 'html.parser')
+    page.body.clear()
+    page.body.append(logo_lines)
+    page.body.append(main_content)
+    head_lines = BeautifulSoup('<link rel="stylesheet" href="/styles/deployment-es/tutorial.concat.css">', 'html.parser')
+    bottom_lines = BeautifulSoup(get_bottom_lines(), 'html.parser')
+    page.head.append(head_lines)
+    page.body.append(bottom_lines)
+    #print(page.head)
+
+    page = handle_page_links(page, url)
+    #print(page.head)
     return page
 
 def do_lesson_page(url, page):
-    css_files = page.find_all(['link',{'rel':'stylesheet'},'link',{'rel':'preload'}])
-
-    for link in css_files:
-        link.extract()
-
-    for s in page(["script", "style"]): # remove all javascript and stylesheet code
-        s.extract()
-
-    for comments in page.head.findAll(text=lambda text:isinstance(text, Comment)):
-        comments.extract()
-
-    #for tag in page.find_all('iframe'):
-    #    tag.decompose()
+    page = scrub_header(page)
 
     # get nav content
     nav_up_link = page.find('a', class_ = 'header-tutorial-link')['href']
@@ -125,6 +139,7 @@ def do_lesson_page(url, page):
     main_content['style'] = "width:960px; margin: 0 auto;" # because wrappers not included
 
     main_content.find("div", class_ = 'infinite-nav').decompose()
+    main_content.find("div", class_ = 'fullpage-nav').decompose()
 
 
     # wes4BlAXgzg
@@ -155,17 +170,36 @@ def do_lesson_page(url, page):
     print(page.head)
 
     page = handle_page_links(page, url)
-    print(page.head)
+    #print(page.head)
+
+    return page
+
+def scrub_header(page):
+    css_files = page.find_all(['link',{'rel':'stylesheet'},'link',{'rel':'preload'}])
+
+    for link in css_files:
+        link.extract()
+
+    for s in page(["script", "style"]): # remove all javascript and stylesheet code
+        s.extract()
+
+    for comments in page.head.findAll(text=lambda text:isinstance(text, Comment)):
+        comments.extract()
 
     return page
 
 def get_youtube_video_block(block):
     # use full links and convert_link will fix them later
     # block is iframe but converted to video with explicit links
+    # video extension needs to agree with what get_youtube_video downloads
+    # webm at 480p is format 244
+    # we are assuming this is available for all videos
+    video_ext = '.webm'
+
     embed_html = '<video controls width="853" height="480" '
     video_link = block.iframe['src']
     video_link = urljoin(video_link, urlparse(video_link).path)
-    video_src = 'src="' + video_link + '.mp4" '
+    video_src = 'src="' + video_link + video_ext +'" '
     poster_src = 'poster="' + video_link + '.webp"'
 
     #video_id = urlparse(video_link).path.split('/')[-1]
@@ -242,6 +276,7 @@ def handle_page_links(page, page_url):
                 if link_type:
                     get_site_asset(abs_url, link_type)
                 else:
+                    # this could be file not from source so not in site_urls
                     print('Unable to download ' + abs_url)
             else:
                 continue
@@ -264,7 +299,7 @@ def handle_video_tag(video_tag, page_url):
     if video_link:
         video_tag['src'] = convert_link(page_url, video_link)
         if is_youtube:
-            get_youtube_video(video_link)
+            get_youtube_video(video_link, format='244') # 480p webm
         else:
             get_site_media_asset(page_url, video_link)
 
@@ -280,7 +315,7 @@ def get_site_media_asset(page_url, url):
     link_type = site_urls.get(abs_url,{}).get('content-type', None)
     get_site_asset(url, link_type)
 
-def get_youtube_video(video_link):
+def get_youtube_video(video_link, format='bestaudio/best'):
     # gets both video and poster
     video_id = urlparse(video_link).path.split('/')[-1].split('.')[0]
     asset_file_name = url_to_file_name(video_link, None) # extension should be there from video block
@@ -289,10 +324,19 @@ def get_youtube_video(video_link):
     print("getting", video_link, output_file_name)
     # https://github.com/ytdl-org/youtube-dl/blob/master/README.md#embedding-youtube-dl
     if not os.path.exists(output_file_name):
-        cmd = 'youtube-dl --write-thumbnail -o ' + output_dir + '/%(id)s.%(ext)s ' + video_id
-        # cmd = 'youtube-dl --write-thumbnail -o ' +  output_file_name + ' ' + video_id
-        #print(cmd)
-        subproc_run(cmd)
+        ydl_opts = {'writethumbnail': True, 'format': format, 'outtmpl': output_dir + '/%(id)s.%(ext)s'}
+        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+            ydl.download(['https://www.youtube.com/watch?v=' + video_id])
+
+        #cmd = 'youtube-dl --write-thumbnail -o ' + output_dir + '/%(id)s.%(ext)s ' + video_id
+        #subproc_run(cmd)
+
+def get_youtube_video_info(video_id):
+    ydl = youtube_dl.YoutubeDL()
+    ydl.add_default_info_extractors()
+    info = ydl.extract_info('http://www.youtube.com/watch?v=' + video_id, download=False)
+    formats = info['formats']
+    # is array with 'format_id' and 'format' (description)
 
 def is_link_included(url):
     # check if link matches patterns to include
@@ -393,11 +437,11 @@ def get_bottom_nav(nav_up_link, nav_left_link, nav_right_link):
 
     nav_lines = '<div style="text-align:center;margin-top:40px;width: 400px;margin-left: auto;margin-right: auto;">'
     nav_lines += '<div style="float: left;"><a href="' + nav_left_link + '">'
-    nav_lines += '<img src="/edu.gcfglobal.org/assets/left-arrow.png" style="opacity:' + left_opacity + ';"></a></div>'
+    nav_lines += '<img src="/assets/left-arrow.png" style="opacity:' + left_opacity + ';"></a></div>'
     nav_lines += '<div style="float: right;"><a href="' + nav_right_link + '">'
-    nav_lines += '<img src="/edu.gcfglobal.org/assets/right-arrow.png" style="opacity:' + right_opacity + ';"></a></div>'
+    nav_lines += '<img src="/assets/right-arrow.png" style="opacity:' + right_opacity + ';"></a></div>'
     nav_lines += '<div style="text-align:left;margin:0 auto !important;display:inline-block;"><a href="' + nav_up_link + '">'
-    nav_lines += '<img src="/edu.gcfglobal.org/assets/up-arrow.png"></a></div>'
+    nav_lines += '<img src="/assets/up-arrow.png"></a></div>'
     nav_lines += '</div>'
     return nav_lines
 
