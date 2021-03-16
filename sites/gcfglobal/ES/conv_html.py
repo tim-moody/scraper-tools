@@ -39,27 +39,64 @@ def main(args):
     if args.nodownload:
         DOWNLOAD_ASSETS = False
 
-    top_list = START_PAGE
-    topic_list = get_topic_list(top_list)
-    for topic in topic_list:
-        lesson_list = get_lesson_list(topic)
-        # convert_page(topic, 'topic')
-        for lesson in lesson_list:
-            pass
-            # convert_page(lesson, 'lesson')
+    top_url = START_PAGE
 
-    pass
+    page, page_file_name = get_page(top_url)
+    course_list = get_topic_list(page, top_url)
 
-def get_topic_list(index_url):
-    topic_list = []
-    page, page_file_name = get_page(index_url)
-    for topic in page.find_all('ul', class_ = 'level-1'):
-        li_list = topic.find_all('li')
-        for li in li_list:
-            topic_url = urljoin(index_url, li.a['href'])
-            topic_list.append(topic_url)
-    #return ['https://edu.gcfglobal.org/es/como-usar-whatsapp/']
-    return topic_list
+    for course_index in course_list:
+        #do_course(course_index)
+        pass
+
+    page = do_top_index_page(top_url, page)
+    output_converted_page(page, page_file_name)
+
+def get_topic_list(index_page, index_url):
+    # topic section ul all-topics
+    #   topic li all-topics
+    #     topic courses ul level-1 (only one per topic)
+    #       course li
+    course_list = []
+    topic_section = index_page.find('ul', class_ = 'all-topics')
+    topics = topic_section.find_all('li', class_ = 'all-topics')
+    for topic in topics:
+        topic_header = topic.find('ul', class_ = 'level-1')
+        topic_courses = topic_header.find_all('li')
+        for course in topic_courses:
+            course_url = urljoin(index_url, course.a['href'])
+            course_list.append(course_url)
+    return course_list
+
+def do_top_index_page(top_url, page):
+    page = scrub_header(page)
+
+    title_div = BeautifulSoup('<div class="title-content"><h1>Todos los cursos</h1></div>', 'html.parser')
+    main_content = page.find('ul', class_ = 'all-topics')
+
+    # make topics headings not links
+    topics = main_content.find_all('li', class_ = 'all-topics')
+    for topic in topics:
+        heading = BeautifulSoup('<h2>' + topic.a.text + '</h2>', 'html.parser')
+        topic.a.replace_with(heading)
+
+    logo_lines = BeautifulSoup(get_logo_lines(), 'html.parser')
+
+    page.body.clear()
+    page.body.append(logo_lines)
+    #page.body.append(title_div)
+    page.body.append(BeautifulSoup('<div style="margin-left:20px;">', 'html.parser'))
+    page.body.div.append(title_div)
+    page.body.div.append(main_content)
+
+    head_lines = BeautifulSoup('<link rel="stylesheet" href="https://edu.gcfglobal.org/styles/deployment-es/alltopics.concat.css">', 'html.parser')
+    bottom_lines = BeautifulSoup(get_bottom_lines(), 'html.parser')
+    page.head.append(head_lines)
+    page.body.append(bottom_lines)
+    #print(page.head)
+
+    page = handle_page_links(page, top_url)
+    #print(page.head)
+    return page
 
 def do_course(course_index):
     # process index
@@ -70,7 +107,7 @@ def do_course(course_index):
 
     course_section = page.find("div", id = 'content-area')
     for lesson in course_section.find_all('li'):
-        lesson_url = urljoin(topic_url, lesson.a['href'])
+        lesson_url = urljoin(course_index, lesson.a['href'])
         convert_page(lesson_url, 'lesson')
 
     page = do_course_index_page(course_index, page)
@@ -115,7 +152,7 @@ def do_course_index_page(url, page):
     page.body.clear()
     page.body.append(logo_lines)
     page.body.append(main_content)
-    head_lines = BeautifulSoup('<link rel="stylesheet" href="/styles/deployment-es/tutorial.concat.css">', 'html.parser')
+    head_lines = BeautifulSoup('<link rel="stylesheet" href="https://edu.gcfglobal.org/styles/deployment-es/tutorial.concat.css">', 'html.parser')
     bottom_lines = BeautifulSoup(get_bottom_lines(), 'html.parser')
     page.head.append(head_lines)
     page.body.append(bottom_lines)
@@ -228,7 +265,7 @@ def handle_page_links(page, page_url):
         if not href:
             continue
 
-        print('href is ' + href + ' in ' + tag.name)
+        #print('href is ' + href + ' in ' + tag.name)
         if href[0] == '#': # internal
             continue
 
