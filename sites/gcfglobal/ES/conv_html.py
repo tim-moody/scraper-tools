@@ -18,6 +18,7 @@ HTML_EXCL_PATTERNS = []
 OUTPUT_FILE_PREFIX = 'site'
 DOWNLOAD_DIR = 'site-download/'
 DOWNLOAD_ASSETS = True
+INCL_YOUTUBE = True
 
 dst_dir = '/library/www/html/modules/es-GCF2021/'
 external_url_not_found = '/not-offline.html'
@@ -32,7 +33,11 @@ page_links = {}
 url = 'https://edu.gcfglobal.org/es/como-usar-whatsapp/como-instalar-y-crear-una-cuenta-en-whatsapp-/1/'
 url2 = 'https://edu.gcfglobal.org/es/como-usar-windows-10/que-es-el-area-de-notificaciones-de-windows-10/1/'
 url3 = 'https://edu.gcfglobal.org/es/excel-2016/como-crear-un-nuevo-archivo-en-excel-2016/1/'
-url4 = 'https://edu.gcfglobal.org/es/seguridad-en-internet/'
+url4 = 'https://edu.gcfglobal.org/es/excel-2016/elementos-de-excel-2016/1/'
+u5 = 'https://edu.gcfglobal.org/es/seguridad-en-internet/control-parental-en-mac/1/'
+c1 = 'https://edu.gcfglobal.org/es/seguridad-en-internet/'
+c2 =  "https://edu.gcfglobal.org/es/excel-2016/"
+c3 = "https://edu.gcfglobal.org/es/como-usar-whatsapp/"
 
 def main(args):
     global DOWNLOAD_ASSETS
@@ -45,7 +50,7 @@ def main(args):
     course_list = get_topic_list(page, top_url)
 
     for course_index in course_list:
-        #do_course(course_index)
+        do_course(course_index)
         pass
 
     page = do_top_index_page(top_url, page)
@@ -148,7 +153,7 @@ def do_course_index_page(url, page):
     main_content = page.find("div", id = 'content-area')
     main_content['style'] = "width:960px; margin: 0 auto;" # because wrappers not included
 
-    logo_lines = BeautifulSoup(get_logo_lines(), 'html.parser')
+    logo_lines = BeautifulSoup(get_logo_lines(link=START_PAGE), 'html.parser')
     page.body.clear()
     page.body.append(logo_lines)
     page.body.append(main_content)
@@ -178,16 +183,22 @@ def do_lesson_page(url, page):
     main_content.find("div", class_ = 'infinite-nav').decompose()
     main_content.find("div", class_ = 'fullpage-nav').decompose()
 
+    # handle data-url - FUTURE
+    # <div class="wrapperpopup">
+    # <div class="gcf_interactive" data-url=
+    # for a in d.attrs.keys():
+    # for now just remove section
 
-    # wes4BlAXgzg
-    # u_0Ns6paWQE
+    wrapperpopup = main_content.find("div", class_ = 'wrapperpopup')
+    if wrapperpopup:
+        wrapperpopup.decompose()
 
     video_blocks =  main_content.find_all("div", class_ = 'video-embed')
     for video_block in video_blocks:
         new_embed = get_youtube_video_block(video_block)
         video_block.iframe.replace_with(new_embed)
 
-    logo_lines = BeautifulSoup(get_logo_lines(), 'html.parser')
+    logo_lines = BeautifulSoup(get_logo_lines(link=nav_up_link), 'html.parser')
     #main_content.div.insert_before(logo_lines)
 
     page.body.clear()
@@ -204,7 +215,7 @@ def do_lesson_page(url, page):
     page.head.append(head_lines)
     page.body.append(bottom_nav)
     page.body.append(bottom_lines)
-    print(page.head)
+    #print(page.head)
 
     page = handle_page_links(page, url)
     #print(page.head)
@@ -334,11 +345,11 @@ def handle_video_tag(video_tag, page_url):
         # get youtube video and poster
 
     if video_link:
-        video_tag['src'] = convert_link(page_url, video_link)
         if is_youtube:
-            get_youtube_video(video_link, format='244') # 480p webm
+            video_tag['src'] = get_youtube_video(video_link, pref_format=['244', '243', '135', '134', '18']) # 480p webm '244/243/135/134/18'
         else:
             get_site_media_asset(page_url, video_link)
+            video_tag['src'] = convert_link(page_url, video_link)
 
     if poster_link:
         video_tag['poster'] = convert_link(page_url, poster_link)
@@ -352,28 +363,67 @@ def get_site_media_asset(page_url, url):
     link_type = site_urls.get(abs_url,{}).get('content-type', None)
     get_site_asset(url, link_type)
 
-def get_youtube_video(video_link, format='bestaudio/best'):
+def get_youtube_video(video_link, pref_format=None):
     # gets both video and poster
+    # format can be None or one or more format ids
+    # returns url including extension
+
     video_id = urlparse(video_link).path.split('/')[-1].split('.')[0]
-    asset_file_name = url_to_file_name(video_link, None) # extension should be there from video block
+    format = None
+    if pref_format:
+        act_formats = get_youtube_video_formats(video_id)
+        #print(act_formats)
+        for fmt in pref_format: # list of format ids
+            if fmt in act_formats:
+                format = fmt
+                ext = act_formats[fmt]['ext']
+                break
+    if not format:
+        print('No matching video format found for ' + video_id)
+        return video_link
+
+    # <div style="height: 480px; width: 853px; background-color: grey; vertical-align: middle;">Video no disponible</div>
+    # <div style="line-height: 480px; width: 853px;background-color: grey;vertical-align: middle; color: white;">Video no disponible</div>
+    # <div style="margin: auto; line-height: 480px;width: 853px;background-color: grey;vertical-align: middle; color: white;">Video no disponible</div>
+
+    # can get high quality jpeg with https://i.ytimg.com/vi/<video id>/hqdefault.jpg
+    # would need to rename
+    # includes jpg for (at least some) images that downloaded as webp
+    # BUT it is smaller
+    # OK looks like webp is maxresdefault.jpg converted to webp; is about 2/3 the size
+
+    # OK info2.get('thumbnails')[-1] is equivalent to maxresdefault
+    # BUT can be https://i.ytimg.com/vi_webp/wes4BlAXgzg/maxresdefault.webp or https://i.ytimg.com/vi/vOiX3S_o15g/maxresdefault.jpg
+
+    # also http://www.youtube.com/oembed?format=json&url=https://youtube.com/watch?v=<video id>
+
+    asset_file_name = url_to_file_name(video_link, 'video/' + ext, incl_query=False)
     output_file_name = dst_dir + asset_file_name
     output_dir = output_dir = os.path.dirname(output_file_name)
     print("getting", video_link, output_file_name)
     # https://github.com/ytdl-org/youtube-dl/blob/master/README.md#embedding-youtube-dl
     if not os.path.exists(output_file_name):
-        ydl_opts = {'writethumbnail': True, 'format': format, 'outtmpl': output_dir + '/%(id)s.%(ext)s'}
+        ydl_opts = {'writethumbnail': True, 'format': format, 'outtmpl': output_dir + '/%(id)s.%(ext)s'} # %(format_id)s
         with youtube_dl.YoutubeDL(ydl_opts) as ydl:
             ydl.download(['https://www.youtube.com/watch?v=' + video_id])
 
         #cmd = 'youtube-dl --write-thumbnail -o ' + output_dir + '/%(id)s.%(ext)s ' + video_id
         #subproc_run(cmd)
 
-def get_youtube_video_info(video_id):
+def get_youtube_video_formats(video_id):
+    # what about thumbnail formats --list-thumbnails
+    # info.get('thumbnails')
+    # can be name .vid and .img and seems to work
+    video_formats = {}
     ydl = youtube_dl.YoutubeDL()
     ydl.add_default_info_extractors()
     info = ydl.extract_info('http://www.youtube.com/watch?v=' + video_id, download=False)
     formats = info['formats']
-    # is array with 'format_id' and 'format' (description)
+    thumbnails = info['thumbnails']
+    # is array with 'format_id', 'ext', 'width', 'height', and 'format' (description); also has duration
+    for fmt in formats:
+        video_formats[fmt['format_id']] = {'ext':fmt['ext'], 'width':fmt['width'], 'height': fmt['height']}
+    return video_formats, thumbnails
 
 def is_link_included(url):
     # check if link matches patterns to include
@@ -449,14 +499,14 @@ def get_head_lines():
     # <script defer src="/scripts/deployment-es/tutorial.concat.js" type="text/javascript"></script> no help
     return head_lines
 
-def get_logo_lines():
-    logo_lines = '''
-    <div style="margin-left:20px;">
-    <a class="logo-link" href="/es/">
-    <img style="height:50px;" class="logo logo-left main-logo-es" src="/assets/gcfglobal-color.png"></a>
-    <img style="height:60px;" class="logo logo-middle logo-es" src="/assets/logo-es.svg">
-    </div>
-    '''
+def get_logo_lines(link='#'):
+    logo_lines = '<div style="margin-left:20px;">'
+    logo_lines += '<a class="logo-link" href="' + START_PAGE + '">'
+    logo_lines += '<img style="height:50px;" class="logo logo-left main-logo-es" src="/assets/gcfglobal-color.png"></a>'
+    logo_lines += '<a class="logo-link" href="' + link + '">'
+    logo_lines += '<img style="height:60px;" class="logo logo-middle logo-es" src="/assets/logo-es.svg"></a>'
+    logo_lines += '</div>'
+
     return logo_lines
 
 # also http://jsfiddle.net/wSd32/1/

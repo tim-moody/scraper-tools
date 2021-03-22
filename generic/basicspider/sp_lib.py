@@ -138,7 +138,7 @@ def source_domain_to_regex(domain_list):
         regex_list.append(reg)
         return regex_list
 
-def url_to_file_name(url, content_type, url_map=None, incl_netloc=True):
+def url_to_file_name(url, content_type, url_map=None, incl_netloc=True, incl_query=True):
     # url expected to be absolute
     # https://developers.google.com/safe-browsing/v4/urls-hashing as alternative
     #print(url, content_type)
@@ -157,7 +157,10 @@ def url_to_file_name(url, content_type, url_map=None, incl_netloc=True):
         query = '?' + query
     ext = path.split('.')[-1]
     if '/' not in ext: # is dot in path or before extension
-        file_name = netloc + path + query
+        file_name = netloc + path
+        if incl_query:
+            file_name += query
+
         #print(re.sub('/+', '/', file_name))
         return re.sub('/+', '/', file_name) # remove multiple /s
     # Fix up other paths
@@ -179,7 +182,9 @@ def url_to_file_name(url, content_type, url_map=None, incl_netloc=True):
             ext = '.' + content_type.split('/')[1]
         else:
             ext = ''
-    file_name = netloc + path + ext + query
+    file_name = netloc + path + ext
+    if incl_query:
+        file_name += query
     #print(re.sub('/+', '/', file_name))
     return re.sub('/+', '/', file_name) # remove multiple /s
 
