@@ -19,6 +19,8 @@ OUTPUT_FILE_PREFIX = 'site'
 DOWNLOAD_DIR = 'site-download/'
 DOWNLOAD_ASSETS = True
 INCL_YOUTUBE = True
+PREF_YOUTUBE_FORMATS = ['244', '243', '135', '134', '18'] # 480p webm, etc.
+NO_VIDEO_MSG = 'Video no disponible'
 
 dst_dir = '/library/www/html/modules/es-GCF2021/'
 external_url_not_found = '/not-offline.html'
@@ -50,7 +52,7 @@ def main(args):
     course_list = get_topic_list(page, top_url)
 
     for course_index in course_list:
-        do_course(course_index)
+        #do_course(course_index)
         pass
 
     page = do_top_index_page(top_url, page)
@@ -240,20 +242,26 @@ def get_youtube_video_block(block):
     # use full links and convert_link will fix them later
     # block is iframe but converted to video with explicit links
     # video extension needs to agree with what get_youtube_video downloads
-    # webm at 480p is format 244
-    # we are assuming this is available for all videos
-    video_ext = '.webm'
+    # this is based on the format
+    # same for poster extension
 
-    embed_html = '<video controls width="853" height="480" '
     video_link = block.iframe['src']
     video_link = urljoin(video_link, urlparse(video_link).path)
-    video_src = 'src="' + video_link + video_ext +'" '
-    poster_src = 'poster="' + video_link + '.webp"'
+    # video_formats, thumbnails = get_youtube_video_formats(video_id)
 
-    #video_id = urlparse(video_link).path.split('/')[-1]
-    #embed_html += video_id + '.mp4" poster="/videos/' + video_id
-    embed_html += video_src + poster_src + '></video>'
-    #return '<video controls width="853" src="/videos/wes4BlAXgzg.mp4" poster="/videos/wes4BlAXgzg.webp"></video>'
+    if not INCL_YOUTUBE:
+        embed_html = '<div style="margin: auto; line-height: 480px;width: 853px;background-color: grey;vertical-align: middle; color: white;">' + NO_VIDEO_MSG + '</div>'
+    else:
+        video_ext, poster_ext, video_format = get_youtube_names(video_link, PREF_YOUTUBE_FORMATS) # 480p webm '244/243/135/134/18'
+        if video_format == None:
+            embed_html = '<div style="margin: auto; line-height: 480px;width: 853px;background-color: grey;vertical-align: middle; color: white;">' + NO_VIDEO_MSG + '</div>'
+        else:
+            embed_html = '<video controls width="853" height="480" '
+            video_link = urljoin(video_link, urlparse(video_link).path)
+            video_src = 'src="' + video_link + video_ext + '" video-format="' + video_format + '" '
+            poster_src = 'poster="' + video_link + poster_ext + '"'
+        embed_html += video_src + poster_src + '></video>'
+
     #print(embed_html)
     new_embed = BeautifulSoup(embed_html, 'html.parser')
     return new_embed
@@ -342,11 +350,12 @@ def handle_video_tag(video_tag, page_url):
 
     if 'www.youtube.com' in video_link or 'www.youtu.be' in video_link:
         is_youtube = True
+        yt_format = video_tag.get('video-format') # custom attribute to save preferred format
         # get youtube video and poster
 
     if video_link:
         if is_youtube:
-            video_tag['src'] = get_youtube_video(video_link, pref_format=['244', '243', '135', '134', '18']) # 480p webm '244/243/135/134/18'
+            video_tag['src'] = get_youtube_video(video_link, yt_format)
         else:
             get_site_media_asset(page_url, video_link)
             video_tag['src'] = convert_link(page_url, video_link)
@@ -363,24 +372,15 @@ def get_site_media_asset(page_url, url):
     link_type = site_urls.get(abs_url,{}).get('content-type', None)
     get_site_asset(url, link_type)
 
-def get_youtube_video(video_link, pref_format=None):
+def get_youtube_video(video_link, video_format):
     # gets both video and poster
     # format can be None or one or more format ids
     # returns url including extension
 
-    video_id = urlparse(video_link).path.split('/')[-1].split('.')[0]
-    format = None
-    if pref_format:
-        act_formats = get_youtube_video_formats(video_id)
-        #print(act_formats)
-        for fmt in pref_format: # list of format ids
-            if fmt in act_formats:
-                format = fmt
-                ext = act_formats[fmt]['ext']
-                break
-    if not format:
-        print('No matching video format found for ' + video_id)
-        return video_link
+    video_name = urlparse(video_link).path.split('/')[-1]
+    video_id = video_name.split('.')[0]
+    video_ext = video_name.split('.')[1]
+
 
     # <div style="height: 480px; width: 853px; background-color: grey; vertical-align: middle;">Video no disponible</div>
     # <div style="line-height: 480px; width: 853px;background-color: grey;vertical-align: middle; color: white;">Video no disponible</div>
@@ -397,18 +397,37 @@ def get_youtube_video(video_link, pref_format=None):
 
     # also http://www.youtube.com/oembed?format=json&url=https://youtube.com/watch?v=<video id>
 
-    asset_file_name = url_to_file_name(video_link, 'video/' + ext, incl_query=False)
+    asset_file_name = url_to_file_name(video_link, 'video/' + video_ext, incl_query=False)
     output_file_name = dst_dir + asset_file_name
     output_dir = output_dir = os.path.dirname(output_file_name)
     print("getting", video_link, output_file_name)
     # https://github.com/ytdl-org/youtube-dl/blob/master/README.md#embedding-youtube-dl
     if not os.path.exists(output_file_name):
-        ydl_opts = {'writethumbnail': True, 'format': format, 'outtmpl': output_dir + '/%(id)s.%(ext)s'} # %(format_id)s
+        ydl_opts = {'writethumbnail': True, 'format': video_format, 'outtmpl': output_dir + '/%(id)s.%(ext)s'} # %(format_id)s
         with youtube_dl.YoutubeDL(ydl_opts) as ydl:
             ydl.download(['https://www.youtube.com/watch?v=' + video_id])
 
         #cmd = 'youtube-dl --write-thumbnail -o ' + output_dir + '/%(id)s.%(ext)s ' + video_id
         #subproc_run(cmd)
+
+def get_youtube_names(video_link, pref_formats):
+    video_id = urlparse(video_link).path.split('/')[-1].split('.')[0]
+    format = None
+    if pref_formats:
+        act_formats, act_thumbnails = get_youtube_video_formats(video_id)
+        #print(act_formats)
+        for fmt in pref_formats: # list of format ids
+            if fmt in act_formats:
+                format = fmt
+                video_ext = act_formats[fmt]['ext']
+                break
+    if not format:
+        print('No matching video format found for ' + video_id)
+        return None, None, None
+    else:
+        thumb_ext = act_thumbnails[-1] # last is maxresdefault
+        thumb_ext = act_thumbnails[-1]['url'].split('?')[0].split('.')[-1]
+        return '.' + video_ext, '.' +  thumb_ext, format
 
 def get_youtube_video_formats(video_id):
     # what about thumbnail formats --list-thumbnails
