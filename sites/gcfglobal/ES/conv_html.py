@@ -52,7 +52,7 @@ def main(args):
     course_list = get_topic_list(page, top_url)
 
     for course_index in course_list:
-        #do_course(course_index)
+        do_course(course_index)
         pass
 
     page = do_top_index_page(top_url, page)
@@ -191,13 +191,22 @@ def do_lesson_page(url, page):
     # for a in d.attrs.keys():
     # for now just remove section
 
+    more_info = main_content.find("p", class_ = "moreInfo")
+    if more_info:
+        print('Removing moreInfo section.')
+        more_info.decompose()
+
     wrapperpopup = main_content.find("div", class_ = 'wrapperpopup')
     if wrapperpopup:
         wrapperpopup.decompose()
 
     video_blocks =  main_content.find_all("div", class_ = 'video-embed')
     for video_block in video_blocks:
-        new_embed = get_youtube_video_block(video_block)
+        try:
+            video_link = block.iframe['src']
+        except:
+            continue
+        new_embed = get_youtube_video_block(video_link)
         video_block.iframe.replace_with(new_embed)
 
     logo_lines = BeautifulSoup(get_logo_lines(link=nav_up_link), 'html.parser')
@@ -238,14 +247,13 @@ def scrub_header(page):
 
     return page
 
-def get_youtube_video_block(block):
+def get_youtube_video_block(video_link):
     # use full links and convert_link will fix them later
     # block is iframe but converted to video with explicit links
     # video extension needs to agree with what get_youtube_video downloads
     # this is based on the format
     # same for poster extension
 
-    video_link = block.iframe['src']
     video_link = urljoin(video_link, urlparse(video_link).path)
     # video_formats, thumbnails = get_youtube_video_formats(video_id)
 
@@ -260,7 +268,7 @@ def get_youtube_video_block(block):
             video_link = urljoin(video_link, urlparse(video_link).path)
             video_src = 'src="' + video_link + video_ext + '" video-format="' + video_format + '" '
             poster_src = 'poster="' + video_link + poster_ext + '"'
-        embed_html += video_src + poster_src + '></video>'
+            embed_html += video_src + poster_src + '></video>'
 
     #print(embed_html)
     new_embed = BeautifulSoup(embed_html, 'html.parser')
@@ -338,12 +346,16 @@ def handle_page_links(page, page_url):
                 continue
         else: # do the others individually
             if tag.name == 'video':
+                if tag.get('src'):
+                    tag = handle_video_tag(tag, page_url)
+            elif tag.name == 'source':
                 tag = handle_video_tag(tag, page_url)
             else:
                 print('Unhandled tag', tag.name)
     return page
 
 def handle_video_tag(video_tag, page_url):
+    # need to handle source sub tag
     video_link = video_tag.get('src')
     poster_link = video_tag.get('poster')
     is_youtube = False
@@ -355,7 +367,8 @@ def handle_video_tag(video_tag, page_url):
 
     if video_link:
         if is_youtube:
-            video_tag['src'] = get_youtube_video(video_link, yt_format)
+            get_youtube_video(video_link, yt_format)
+            video_tag['src'] = convert_link(page_url, video_link)
         else:
             get_site_media_asset(page_url, video_link)
             video_tag['src'] = convert_link(page_url, video_link)
@@ -412,22 +425,25 @@ def get_youtube_video(video_link, video_format):
 
 def get_youtube_names(video_link, pref_formats):
     video_id = urlparse(video_link).path.split('/')[-1].split('.')[0]
-    format = None
-    if pref_formats:
+
+    try:
         act_formats, act_thumbnails = get_youtube_video_formats(video_id)
-        #print(act_formats)
-        for fmt in pref_formats: # list of format ids
-            if fmt in act_formats:
-                format = fmt
-                video_ext = act_formats[fmt]['ext']
-                break
+    except:
+        return None, None, None
+
+    format = None
+    for fmt in pref_formats: # list of format ids
+        if fmt in act_formats:
+            format = fmt
+            video_ext = act_formats[fmt]['ext']
+            break
     if not format:
         print('No matching video format found for ' + video_id)
         return None, None, None
-    else:
-        thumb_ext = act_thumbnails[-1] # last is maxresdefault
-        thumb_ext = act_thumbnails[-1]['url'].split('?')[0].split('.')[-1]
-        return '.' + video_ext, '.' +  thumb_ext, format
+    #else:
+    thumb_ext = act_thumbnails[-1] # last is maxresdefault
+    thumb_ext = act_thumbnails[-1]['url'].split('?')[0].split('.')[-1]
+    return '.' + video_ext, '.' +  thumb_ext, format
 
 def get_youtube_video_formats(video_id):
     # what about thumbnail formats --list-thumbnails
