@@ -52,7 +52,7 @@ def main(args):
     course_list = get_topic_list(page, top_url)
 
     for course_index in course_list:
-        # do_course(course_index)
+        do_course(course_index)
         pass
 
     page = do_top_index_page(top_url, page)
