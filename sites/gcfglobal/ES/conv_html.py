@@ -162,7 +162,7 @@ def do_course_index_page(url, page):
     page.body.clear()
     page.body.append(logo_lines)
     page.body.append(main_content)
-    head_lines = BeautifulSoup(get_index_head_lines(), 'html.parser')
+    head_lines = BeautifulSoup(get_course_index_head_lines(), 'html.parser')
     bottom_lines = BeautifulSoup(get_bottom_lines(), 'html.parser')
     page.head.append(head_lines)
     page.body.append(bottom_lines)
@@ -508,31 +508,32 @@ def get_site_asset(url, content_type):
     if not os.path.exists(output_file_name):
         download_binary_url(url, output_file_name)
 
-def get_head_lines():
+def get_course_index_head_lines():
     head_lines = '''
-    <link rel="stylesheet" href="https://edu.gcfglobal.org/styles/deployment-es/lessonpage-es.concat.css">
-     <style>
-        @media only screen and (min-width: 960px) {
-        #content-area {
-          width: 960px;
-          margin: 0 auto;
-          }
-        }
-        </style>
-    '''
-    return head_lines
-
-def get_index_head_lines():
-    head_lines = '''
-    <link rel="stylesheet" href="https://edu.gcfglobal.org/styles/deployment-es/alltopics.concat.css">
-    <script src="https://edu.gcfglobal.org/scripts/deployment-es/alltopics.concat.js" type="text/javascript"></script>
+    <link rel="stylesheet" href="https://edu.gcfglobal.org/styles/deployment-es/tutorial.concat.css">
 
     <style>
     @media only screen and (min-width: 960px) {
     #content-area {
-        width: 960px;
-        margin: 0 auto;
-        }
+    width: 960px;
+    margin: 0 auto;
+    }
+    }
+    </style>
+    '''
+    #<link rel="stylesheet" href="https://edu.gcfglobal.org/styles/deployment-es/alltopics.concat.css">
+    #<script src="https://edu.gcfglobal.org/scripts/deployment-es/alltopics.concat.js" type="text/javascript"></script>
+    return head_lines
+
+def get_head_lines():
+    head_lines = '''
+    <link rel="stylesheet" href="https://edu.gcfglobal.org/styles/deployment-es/lessonpage-es.concat.css">
+    <style>
+    @media only screen and (min-width: 960px) {
+    #content-area {
+    width: 960px;
+    margin: 0 auto;
+    }
     }
     </style>
     '''
