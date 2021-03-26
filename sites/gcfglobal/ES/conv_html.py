@@ -83,7 +83,7 @@ def do_top_index_page(top_url, page):
     # make topics headings not links
     topics = main_content.find_all('li', class_ = 'all-topics')
     for topic in topics:
-        heading = BeautifulSoup('<a>' + topic.a.text + '</a>', 'html.parser')
+        heading = BeautifulSoup('<a>' + topic.a.text + '</a>', 'html.parser') # needs to be <a> not to break css
         topic.a.replace_with(heading)
 
     logo_lines = BeautifulSoup(get_logo_lines(), 'html.parser')
@@ -258,7 +258,6 @@ def get_youtube_video_block(video_link):
     # same for poster extension
 
     video_link = urljoin(video_link, urlparse(video_link).path)
-    # video_formats, thumbnails = get_youtube_video_formats(video_id)
 
     if not INCL_YOUTUBE:
         embed_html = '<div style="margin: auto; line-height: 480px;width: 853px;background-color: grey;vertical-align: middle; color: white;">' + NO_VIDEO_MSG + '</div>'
@@ -278,7 +277,7 @@ def get_youtube_video_block(video_link):
     return new_embed
 
 def handle_page_links(page, page_url):
-    # calculate links relative current page path
+    # calculate links relative to current page path
     # cases
     #   broken link
     #   no link type
@@ -287,6 +286,7 @@ def handle_page_links(page, page_url):
     #   external outside of filter
     #   other asset
     #   youtube video
+    #   other video
     #   other embed or iframe
 
     links = page.find_all(['a', 'link'], href=True) # check for both a and link tags
@@ -390,28 +390,12 @@ def get_site_media_asset(page_url, url):
 
 def get_youtube_video(video_link, video_format):
     # gets both video and poster
-    # format can be None or one or more format ids
+    # formats must be list of one or more format ids in order of preference
     # returns url including extension
 
     video_name = urlparse(video_link).path.split('/')[-1]
     video_id = video_name.split('.')[0]
     video_ext = video_name.split('.')[1]
-
-
-    # <div style="height: 480px; width: 853px; background-color: grey; vertical-align: middle;">Video no disponible</div>
-    # <div style="line-height: 480px; width: 853px;background-color: grey;vertical-align: middle; color: white;">Video no disponible</div>
-    # <div style="margin: auto; line-height: 480px;width: 853px;background-color: grey;vertical-align: middle; color: white;">Video no disponible</div>
-
-    # can get high quality jpeg with https://i.ytimg.com/vi/<video id>/hqdefault.jpg
-    # would need to rename
-    # includes jpg for (at least some) images that downloaded as webp
-    # BUT it is smaller
-    # OK looks like webp is maxresdefault.jpg converted to webp; is about 2/3 the size
-
-    # OK info2.get('thumbnails')[-1] is equivalent to maxresdefault
-    # BUT can be https://i.ytimg.com/vi_webp/wes4BlAXgzg/maxresdefault.webp or https://i.ytimg.com/vi/vOiX3S_o15g/maxresdefault.jpg
-
-    # also http://www.youtube.com/oembed?format=json&url=https://youtube.com/watch?v=<video id>
 
     asset_file_name = url_to_file_name(video_link, 'video/' + video_ext, incl_query=False)
     output_file_name = dst_dir + asset_file_name
@@ -422,9 +406,6 @@ def get_youtube_video(video_link, video_format):
         ydl_opts = {'writethumbnail': True, 'format': video_format, 'outtmpl': output_dir + '/%(id)s.%(ext)s'} # %(format_id)s
         with youtube_dl.YoutubeDL(ydl_opts) as ydl:
             ydl.download(['https://www.youtube.com/watch?v=' + video_id])
-
-        #cmd = 'youtube-dl --write-thumbnail -o ' + output_dir + '/%(id)s.%(ext)s ' + video_id
-        #subproc_run(cmd)
 
 def get_youtube_names(video_link, pref_formats):
     video_id = urlparse(video_link).path.split('/')[-1].split('.')[0]
@@ -449,9 +430,6 @@ def get_youtube_names(video_link, pref_formats):
     return '.' + video_ext, '.' +  thumb_ext, format
 
 def get_youtube_video_formats(video_id):
-    # what about thumbnail formats --list-thumbnails
-    # info.get('thumbnails')
-    # can be name .vid and .img and seems to work
     video_formats = {}
     ydl = youtube_dl.YoutubeDL()
     ydl.add_default_info_extractors()
@@ -542,7 +520,6 @@ def get_head_lines():
         }
         </style>
     '''
-    # <script defer src="/scripts/deployment-es/tutorial.concat.js" type="text/javascript"></script> no help
     return head_lines
 
 def get_index_head_lines():
