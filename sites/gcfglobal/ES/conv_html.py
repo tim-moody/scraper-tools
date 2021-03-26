@@ -52,7 +52,7 @@ def main(args):
     course_list = get_topic_list(page, top_url)
 
     for course_index in course_list:
-        do_course(course_index)
+        # do_course(course_index)
         pass
 
     page = do_top_index_page(top_url, page)
@@ -83,7 +83,7 @@ def do_top_index_page(top_url, page):
     # make topics headings not links
     topics = main_content.find_all('li', class_ = 'all-topics')
     for topic in topics:
-        heading = BeautifulSoup('<h2>' + topic.a.text + '</h2>', 'html.parser')
+        heading = BeautifulSoup('<a>' + topic.a.text + '</a>', 'html.parser')
         topic.a.replace_with(heading)
 
     logo_lines = BeautifulSoup(get_logo_lines(), 'html.parser')
@@ -95,7 +95,10 @@ def do_top_index_page(top_url, page):
     page.body.div.append(title_div)
     page.body.div.append(main_content)
 
-    head_lines = BeautifulSoup('<link rel="stylesheet" href="https://edu.gcfglobal.org/styles/deployment-es/alltopics.concat.css">', 'html.parser')
+    head_html = '<link rel="stylesheet" href="https://edu.gcfglobal.org/styles/deployment-es/alltopics.concat.css">'
+    head_html += '<script src="https://edu.gcfglobal.org/scripts/deployment-es/alltopics.concat.js" type="text/javascript"></script>'
+    head_lines = BeautifulSoup(head_html, 'html.parser')
+
     bottom_lines = BeautifulSoup(get_bottom_lines(), 'html.parser')
     page.head.append(head_lines)
     page.body.append(bottom_lines)
@@ -153,13 +156,13 @@ def do_course_index_page(url, page):
     page = scrub_header(page)
 
     main_content = page.find("div", id = 'content-area')
-    main_content['style'] = "width:960px; margin: 0 auto;" # because wrappers not included
+    #main_content['style'] = "width:960px; margin: 0 auto;" # because wrappers not included
 
     logo_lines = BeautifulSoup(get_logo_lines(link=START_PAGE), 'html.parser')
     page.body.clear()
     page.body.append(logo_lines)
     page.body.append(main_content)
-    head_lines = BeautifulSoup('<link rel="stylesheet" href="https://edu.gcfglobal.org/styles/deployment-es/tutorial.concat.css">', 'html.parser')
+    head_lines = BeautifulSoup(get_index_head_lines(), 'html.parser')
     bottom_lines = BeautifulSoup(get_bottom_lines(), 'html.parser')
     page.head.append(head_lines)
     page.body.append(bottom_lines)
@@ -180,7 +183,7 @@ def do_lesson_page(url, page):
 
     #main_content = page.find("div", id = 'background')
     main_content = page.find("div", id = 'content-area')
-    main_content['style'] = "width:960px; margin: 0 auto;" # because wrappers not included
+    # main_content['style'] = "width:960px; margin: 0 auto;" # because wrappers not included
 
     main_content.find("div", class_ = 'infinite-nav').decompose()
     main_content.find("div", class_ = 'fullpage-nav').decompose()
@@ -530,8 +533,32 @@ def get_site_asset(url, content_type):
 def get_head_lines():
     head_lines = '''
     <link rel="stylesheet" href="https://edu.gcfglobal.org/styles/deployment-es/lessonpage-es.concat.css">
+     <style>
+        @media only screen and (min-width: 960px) {
+        #content-area {
+          width: 960px;
+          margin: 0 auto;
+          }
+        }
+        </style>
     '''
     # <script defer src="/scripts/deployment-es/tutorial.concat.js" type="text/javascript"></script> no help
+    return head_lines
+
+def get_index_head_lines():
+    head_lines = '''
+    <link rel="stylesheet" href="https://edu.gcfglobal.org/styles/deployment-es/alltopics.concat.css">
+    <script src="https://edu.gcfglobal.org/scripts/deployment-es/alltopics.concat.js" type="text/javascript"></script>
+
+    <style>
+    @media only screen and (min-width: 960px) {
+    #content-area {
+        width: 960px;
+        margin: 0 auto;
+        }
+    }
+    </style>
+    '''
     return head_lines
 
 def get_logo_lines(link='#'):
