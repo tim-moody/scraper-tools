@@ -299,7 +299,7 @@ def handle_page_links(page, page_url):
         if href[0] == '#': # internal
             continue
 
-        href = urljoin(page_url, href) # convert to absolute linke
+        href = cleanup_url(urljoin(page_url, href)) # defrag and convert to absolute link
         # first handle any redirection
         if href in site_redirects:
             href = site_redirects[href]
@@ -307,17 +307,18 @@ def handle_page_links(page, page_url):
         # if type not text get the asset
         link_type = site_urls.get(href,{}).get('content-type', None)
         save_href = href
+        external_url = external_url_not_found + '?url=' + href
 
         if not link_type:
-            href = external_url_not_found
+            href = external_url
         elif link_type == 'broken-link':
-            href = external_url_not_found
+            href = external_url
 
         elif link_type == 'text/html': # only take html links from within filtered urls
             if not is_link_included(href):
-                href = external_url_not_found
+                href = external_url
             elif is_page_link_not_found(page_url, href):
-                href = external_url_not_found
+                href = external_url
 
         href_path = convert_link(page_url, href)
         if not href_path:
