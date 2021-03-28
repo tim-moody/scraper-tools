@@ -205,12 +205,10 @@ def do_lesson_page(url, page):
 
     video_blocks =  main_content.find_all("div", class_ = 'video-embed')
     for video_block in video_blocks:
-        try:
-            video_link = block.iframe['src']
-        except:
-            continue
-        new_embed = get_youtube_video_block(video_link)
-        video_block.iframe.replace_with(new_embed)
+        video_link = video_block.iframe.get('src')
+        if video_link:
+            new_embed = get_youtube_video_block(video_link)
+            video_block.iframe.replace_with(new_embed)
 
     logo_lines = BeautifulSoup(get_logo_lines(link=nav_up_link), 'html.parser')
     #main_content.div.insert_before(logo_lines)
