@@ -37,6 +37,11 @@ url2 = 'https://edu.gcfglobal.org/es/como-usar-windows-10/que-es-el-area-de-noti
 url3 = 'https://edu.gcfglobal.org/es/excel-2016/como-crear-un-nuevo-archivo-en-excel-2016/1/'
 url4 = 'https://edu.gcfglobal.org/es/excel-2016/elementos-de-excel-2016/1/'
 u5 = 'https://edu.gcfglobal.org/es/seguridad-en-internet/control-parental-en-mac/1/'
+u6 = 'https://edu.gcfglobal.org/es/programas-de-hojas-de-calculo/que-es-una-celda-de-hoja-de-calculo/1/'
+u7 = 'https://edu.gcfglobal.org/es/como-usar-whatsapp/configurar-la-descarga-automatica-de-archivos-en-whatsapp/1/' # <p>
+u8 = 'https://edu.gcfglobal.org/es/skype/configuracion-de-privacidad/1/' # no disponible
+u9 = 'https://edu.gcfglobal.org/es/como-funciona-la-nube/como-subir-un-archivo-a-onedrive/1/' # straggler
+
 c1 = 'https://edu.gcfglobal.org/es/seguridad-en-internet/'
 c2 =  "https://edu.gcfglobal.org/es/excel-2016/"
 c3 = "https://edu.gcfglobal.org/es/como-usar-whatsapp/"
@@ -203,12 +208,15 @@ def do_lesson_page(url, page):
     if wrapperpopup:
         wrapperpopup.decompose()
 
-    video_blocks =  main_content.find_all("div", class_ = 'video-embed')
-    for video_block in video_blocks:
-        video_link = video_block.iframe.get('src')
+    # keep it simple
+    # just look for iframes
+    iframes =  main_content.find_all("iframe")
+    for ifr in iframes:
+        video_link = ifr.get('src')
         if video_link:
-            new_embed = get_youtube_video_block(video_link)
-            video_block.iframe.replace_with(new_embed)
+            if '/www.youtube.com' in video_link or 'youtu.be' in video_link: # see if youtube
+                new_embed = get_youtube_video_block(video_link)
+                ifr.replace_with(new_embed)
 
     logo_lines = BeautifulSoup(get_logo_lines(link=nav_up_link), 'html.parser')
     #main_content.div.insert_before(logo_lines)
@@ -256,14 +264,12 @@ def get_youtube_video_block(video_link):
     # same for poster extension
 
     video_link = urljoin(video_link, urlparse(video_link).path)
+    embed_html = '<span style="margin: auto; padding-top: 225px; padding-bottom: 225px; padding-left: 335px; padding-right: 335px; line-height: 480px;'
+    embed_html += ' width: 853px; background-color: grey;vertical-align: middle; color: white;">' + NO_VIDEO_MSG + '</span>'
 
-    if not INCL_YOUTUBE:
-        embed_html = '<div style="margin: auto; line-height: 480px;width: 853px;background-color: grey;vertical-align: middle; color: white;">' + NO_VIDEO_MSG + '</div>'
-    else:
+    if INCL_YOUTUBE:
         video_ext, poster_ext, video_format = get_youtube_names(video_link, PREF_YOUTUBE_FORMATS) # 480p webm '244/243/135/134/18'
-        if video_format == None:
-            embed_html = '<div style="margin: auto; line-height: 480px;width: 853px;background-color: grey;vertical-align: middle; color: white;">' + NO_VIDEO_MSG + '</div>'
-        else:
+        if video_format:
             embed_html = '<video controls width="853" height="480" '
             video_link = urljoin(video_link, urlparse(video_link).path)
             video_src = 'src="' + video_link + video_ext + '" video-format="' + video_format + '" '
