@@ -1,0 +1,22 @@
+# mwoffliner only command
+# use S3
+S3URL="http://iiab-content:9000/?bucketName=mwobucket&keyId=AKIAIOSFODNN7EXAMPLE&secretAccessKey=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+
+# use https://mdwiki.org/wiki/WikiProjectMed:App/IntroPageVersion2 as main
+# remove --format="novid:maxi" \
+
+  mwoffliner \
+  --adminEmail="info@iiab.me" \
+  --customMainPage="WikiProjectMed:App/IntroPage" \
+  --customZimTitle="MDWiki" \
+  --customZimDescription="MDWiki is a collection of healthcare content developed from Wikipedia specifically for offline use." \
+  --customZimFavicon="https://en.wikipedia.org/static/images/project-logos/enwiki.png" \
+  --filenamePrefix="wp_en_medicine" \
+  --mwUrl="https://mdwiki.org/" \
+  --osTmpDir="/dev/shm" \
+  --outputDirectory="/output" \
+  --optimisationCacheUrl=$S3URL \
+  --zstd \
+  --speed="0.1" \
+  --webp \
+  --verbose
