@@ -251,6 +251,8 @@ class BasicSpider(SpiderCore):
                 LOGGER.warning('HEAD request failed for url ' + url)
                 content_type = 'broken-link'
                 break
+            # 400s, 500s, 811? from pinterest all do not break out
+            retries -= 1 # retry anything that did not break
         if retries == 0:
             content_type = 'broken-link'
         content_type = content_type.split(';')[0] # remove char format

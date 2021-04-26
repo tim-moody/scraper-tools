@@ -10,19 +10,19 @@ from bs4 import BeautifulSoup, Comment, SoupStrainer
 import youtube_dl
 from basicspider.sp_lib import *
 
-START_PAGE = 'https://edu.gcfglobal.org/es/topics/'
+START_PAGE = 'https://edu.gcfglobal.org/pt/topics/'
 MAIN_SOURCE_DOMAIN = None
 # HTML_INCL_PATTERNS = ['https://edu.gcfglobal.org/es/', 'http://www.gcfaprendelibre.org/']
-HTML_INCL_PATTERNS = ['https://edu.gcfglobal.org/es/']
+HTML_INCL_PATTERNS = ['https://edu.gcfglobal.org/pt/']
 HTML_EXCL_PATTERNS = []
 OUTPUT_FILE_PREFIX = 'site'
 DOWNLOAD_DIR = 'site-download/'
 DOWNLOAD_ASSETS = True
 INCL_YOUTUBE = True
 PREF_YOUTUBE_FORMATS = ['244', '243', '135', '134', '18'] # 480p webm, etc.
-NO_VIDEO_MSG = 'Video no disponible'
+NO_VIDEO_MSG = 'Vídeo não disponível'
 
-dst_dir = '/library/www/html/modules/es-GCF2021/'
+dst_dir = '/library/www/html/modules/pt-GCF2021/'
 external_url_not_found = '/not-offline.html'
 
 # read stats
@@ -32,19 +32,9 @@ site_redirects = read_json_file(OUTPUT_FILE_PREFIX + '_redirects.json')
 page_links = {}
 
 # for test
-url = 'https://edu.gcfglobal.org/es/como-usar-whatsapp/como-instalar-y-crear-una-cuenta-en-whatsapp-/1/'
-url2 = 'https://edu.gcfglobal.org/es/como-usar-windows-10/que-es-el-area-de-notificaciones-de-windows-10/1/'
-url3 = 'https://edu.gcfglobal.org/es/excel-2016/como-crear-un-nuevo-archivo-en-excel-2016/1/'
-url4 = 'https://edu.gcfglobal.org/es/excel-2016/elementos-de-excel-2016/1/'
-u5 = 'https://edu.gcfglobal.org/es/seguridad-en-internet/control-parental-en-mac/1/'
-u6 = 'https://edu.gcfglobal.org/es/programas-de-hojas-de-calculo/que-es-una-celda-de-hoja-de-calculo/1/'
-u7 = 'https://edu.gcfglobal.org/es/como-usar-whatsapp/configurar-la-descarga-automatica-de-archivos-en-whatsapp/1/' # <p>
-u8 = 'https://edu.gcfglobal.org/es/skype/configuracion-de-privacidad/1/' # no disponible
-u9 = 'https://edu.gcfglobal.org/es/como-funciona-la-nube/como-subir-un-archivo-a-onedrive/1/' # straggler
+url = 'https://edu.gcfglobal.org/pt/seguranca-na-internet/o-que-e-seguranca-na-internet/1/'
 
-c1 = 'https://edu.gcfglobal.org/es/seguridad-en-internet/'
-c2 =  "https://edu.gcfglobal.org/es/excel-2016/"
-c3 = "https://edu.gcfglobal.org/es/como-usar-whatsapp/"
+c1 = 'https://edu.gcfglobal.org/pt/seguranca-na-internet/'
 
 def main(args):
     global DOWNLOAD_ASSETS
@@ -82,7 +72,7 @@ def get_topic_list(index_page, index_url):
 def do_top_index_page(top_url, page):
     page = scrub_header(page)
 
-    title_div = BeautifulSoup('<div class="title-content"><h1>Todos los cursos</h1></div>', 'html.parser')
+    title_div = BeautifulSoup('<div class="title-content"><h1>Todos os cursos</h1></div>', 'html.parser')
     main_content = page.find('ul', class_ = 'all-topics')
 
     # make topics headings not links
@@ -100,8 +90,8 @@ def do_top_index_page(top_url, page):
     page.body.div.append(title_div)
     page.body.div.append(main_content)
 
-    head_html = '<link rel="stylesheet" href="https://edu.gcfglobal.org/styles/deployment-es/alltopics.concat.css">'
-    head_html += '<script src="https://edu.gcfglobal.org/scripts/deployment-es/alltopics.concat.js" type="text/javascript"></script>'
+    head_html = '<link rel="stylesheet" href="https://edu.gcfglobal.org/styles/deployment-pt/alltopics.concat.css">'
+    head_html += '<script src="https://edu.gcfglobal.org/scripts/deployment-pt/alltopics.concat.js" type="text/javascript"></script>'
     head_lines = BeautifulSoup(head_html, 'html.parser')
 
     bottom_lines = BeautifulSoup(get_bottom_lines(), 'html.parser')
@@ -515,7 +505,7 @@ def get_site_asset(url, content_type):
 
 def get_course_index_head_lines():
     head_lines = '''
-    <link rel="stylesheet" href="https://edu.gcfglobal.org/styles/deployment-es/tutorial.concat.css">
+    <link rel="stylesheet" href="https://edu.gcfglobal.org/styles/deployment-pt/tutorial.concat.css">
 
     <style>
     @media only screen and (min-width: 960px) {
@@ -526,13 +516,11 @@ def get_course_index_head_lines():
     }
     </style>
     '''
-    #<link rel="stylesheet" href="https://edu.gcfglobal.org/styles/deployment-es/alltopics.concat.css">
-    #<script src="https://edu.gcfglobal.org/scripts/deployment-es/alltopics.concat.js" type="text/javascript"></script>
     return head_lines
 
 def get_head_lines():
     head_lines = '''
-    <link rel="stylesheet" href="https://edu.gcfglobal.org/styles/deployment-es/lessonpage-es.concat.css">
+    <link rel="stylesheet" href="https://edu.gcfglobal.org/styles/deployment-pt/lessonpage-pt.concat.css">
     <style>
     @media only screen and (min-width: 960px) {
     #content-area {

@@ -1,0 +1,20 @@
+# mwoffliner only command
+# not use S3
+
+# use https://mdwiki.org/wiki/WikiProjectMed:App/IntroPageVersion2 as main
+# remove --format="novid:maxi" \
+
+  mwoffliner \
+  --adminEmail="info@iiab.me" \
+  --customMainPage="WikiProjectMed:App/IntroPage" \
+  --customZimDescription="MD Wiki Articles" \
+  --customZimFavicon="https://en.wikipedia.org/static/images/project-logos/enwiki.png" \
+  --customZimTitle="MD Wiki" \
+  --filenamePrefix="wp_en_md" \
+  --mwUrl="https://mdwiki.org/" \
+  --osTmpDir="/dev/shm" \
+  --outputDirectory="/output" \
+  --zstd \
+  --speed="0.1" \
+  --webp \
+  --verbose
