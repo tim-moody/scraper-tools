@@ -15,18 +15,22 @@ logging.basicConfig(
     ]
 )
 
+INCL_WP = False
 WPMED_LIST = 'http://download.openzim.org/wp1/enwiki/customs/medicine.tsv'
 
-MAX_LOOPS = 5 # -1 is all
+MAX_LOOPS = -1 # -1 is all
 
-# get wp med article list
-try:
-    r = requests.get(WPMED_LIST)
-    wikimed_pages = r._content.decode().split('\n')
-    allpages = set(wikimed_pages)
-except Exception as error:
-    logging.error(error)
-    logging.error('Request for medicine.tsv failed. Ignoring.')
+# get wp med article list if desired
+if INCL_WP:
+    try:
+        r = requests.get(WPMED_LIST)
+        wikimed_pages = r._content.decode().split('\n')
+        allpages = set(wikimed_pages)
+    except Exception as error:
+        logging.error(error)
+        logging.error('Request for medicine.tsv failed. Ignoring.')
+        allpages = set()
+else:
     allpages = set()
 
 for namesp in ['0', '3000']:
