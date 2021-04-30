@@ -25,7 +25,7 @@ class SpiderCore(object):
 
     # subclass can change these
     OUTPUT_FILE_PREFIX = 'site'
-    DOWNLOAD_DEST_DIR = 'site-download/'
+    DOWNLOAD_DEST_DIR = 'site-download/html/'
 
     HTML_INCL_PATTERNS = []
     HTML_EXCL_PATTERNS = []
