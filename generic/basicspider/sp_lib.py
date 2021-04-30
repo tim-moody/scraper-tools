@@ -55,6 +55,12 @@ def download_binary_url(url, output_file_name):
     else:
         print('Failed to download ' + url)
 
+def copy_downloaded_file(src_file, dst_file):
+    output_dir = os.path.dirname(dst_file)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    shutil.copy2(src_file, dst_file)
+
 def filter_urls(url_dict, content_type, match_regexes):
     # handles a single content type
     # assumes url_dict has structure of site_urls
