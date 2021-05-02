@@ -15,8 +15,13 @@ logging.basicConfig(
     ]
 )
 
-INCL_WP = False
+INCL_WP = True
 WPMED_LIST = 'http://download.openzim.org/wp1/enwiki/customs/medicine.tsv'
+
+if INCL_WP:
+    output_file = 'combined.tsv'
+else:
+    output_file = 'mdwiki-only.tsv'
 
 MAX_LOOPS = -1 # -1 is all
 
@@ -55,7 +60,7 @@ for namesp in ['0', '3000']:
         loop_count -= 1
 
 try:
-    with open('mdwiki.tsv', 'w') as f:
+    with open(output_file, 'w') as f:
         for item in allpages:
             f.write("%s\n" % item)
 except Exception as error:
