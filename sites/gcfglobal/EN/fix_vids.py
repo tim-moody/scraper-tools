@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 from _typeshed import NoneType
-import os, string, sys
+import os, sys
 import copy
 import json
 import re
@@ -60,6 +60,38 @@ for video_id in videos:
     cmd = 'youtube-dl --skip-download --all-subs -o "embed/%(id)s.%(ext)s" ' + video_id
     adm.subproc_run(cmd)
 
+# test subtitles
+subs = ['yJrpo4udXGU.ar.vtt',
+'yJrpo4udXGU.cs.vtt',
+'yJrpo4udXGU.de.vtt',
+'yJrpo4udXGU.el.vtt',
+'yJrpo4udXGU.en-GB.vtt',
+'yJrpo4udXGU.en.vtt',
+'yJrpo4udXGU.es-419.vtt',
+'yJrpo4udXGU.es.vtt',
+'yJrpo4udXGU.fi.vtt',
+'yJrpo4udXGU.fr.vtt',
+'yJrpo4udXGU.hu.vtt',
+'yJrpo4udXGU.id.vtt',
+'yJrpo4udXGU.ja.vtt',
+'yJrpo4udXGU.ko.vtt',
+'yJrpo4udXGU.nl.vtt',
+'yJrpo4udXGU.pl.vtt',
+'yJrpo4udXGU.pt-BR.vtt',
+'yJrpo4udXGU.pt-PT.vtt',
+'yJrpo4udXGU.ro.vtt',
+'yJrpo4udXGU.ru.vtt',
+'yJrpo4udXGU.sv.vtt',
+'yJrpo4udXGU.th.vtt',
+'yJrpo4udXGU.tr.vtt',
+'yJrpo4udXGU.vi.vtt',
+'yJrpo4udXGU.zh-CN.vtt',
+'yJrpo4udXGU.zh-TW.vtt']
+
+for s in subs:
+    lang = s.split('.')[1]
+    print('<track label="' + lang + '" kind="subtitles" srclang="' + lang + '" src="' + s + '">')
+
 # merge video in 244 with audio in 249 (includes 250/251)
 for v in videos:
     if v in mp4:
@@ -68,7 +100,7 @@ for v in videos:
     adm.subproc_run(cmd)
 
 # test
-video_info = get_youtube_video_info('X1dXMElG2Vo')
+video_info = get_youtube_video_info('yJrpo4udXGU')
 video_formats = get_youtube_video_formats(video_info)
 for id in video_formats:
     print(id, video_formats[id])

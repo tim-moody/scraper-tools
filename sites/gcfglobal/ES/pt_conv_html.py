@@ -570,19 +570,6 @@ def get_bottom_lines():
     '''
     return bottom_lines
 
-################### BELONGS SOMEWHERE ELSE ###################
-def calc_tag_struct(tag):
-    struct_string = ''
-    for parent in tag.parents:
-        if parent.name == 'body':
-            break
-        if parent is None:
-            print(parent)
-        else:
-             print(parent.name, parent.attrs)
-             struct_string = f'{parent.name} {parent.attrs} {struct_string}'
-    return struct_string
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Convert downloaded html. By default downloads asset files")
     parser.add_argument("-n", "--nodownload", help="don't download assets", action="store_true")

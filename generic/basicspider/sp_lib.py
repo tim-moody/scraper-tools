@@ -1,5 +1,6 @@
 import os, string, sys
 import copy
+import glob
 import json
 import re
 import requests
@@ -9,6 +10,7 @@ import uuid
 import shlex
 import subprocess
 from urllib.parse import urljoin, urldefrag, urlparse
+import youtube_dl
 
 def download_urls(url_list, content_type, dest_dir, refresh=False):
     # handles a single content type
@@ -60,6 +62,13 @@ def copy_downloaded_file(src_file, dst_file):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     shutil.copy2(src_file, dst_file)
+
+def copy_multiple_files(pattern, dst_dir):
+    if not os.path.exists(dst_dir):
+        os.makedirs(dst_dir)
+    for file in glob.glob(pattern):
+        #print(file)
+        shutil.copy(file, dst_dir)
 
 def filter_urls(url_dict, content_type, match_regexes):
     # handles a single content type
@@ -250,6 +259,184 @@ def find_page_not_found(url_dict, page_not_found): # no hits on rarediseases?!
             print(this_size, comp_size)
         if url_dict[url]['content-length'] == page_not_found['content-length']:
             print(url)
+
+def select_video_format(video_id):
+    video_info = get_youtube_video_info(video_id)
+    video_formats = get_youtube_video_formats(video_info)
+    ext, video_fmt, audio_fmt = select_480p_format(video_formats)
+    print(video_fmt, video_formats[video_fmt])
+    print(audio_fmt, video_formats[audio_fmt])
+    return video_fmt + '+' + audio_fmt
+
+def select_480p_format(video_formats):
+    # can have a webm audio format and no webm video format
+    webm_audio_fmt, mp4_audio_fmt = select_audio_format(video_formats)
+    if webm_audio_fmt: # try webm first
+        video_fmt = select_webm_480p_format(video_formats)
+        if video_fmt:
+            return 'webm', video_fmt, webm_audio_fmt
+    if mp4_audio_fmt:
+        video_fmt = select_mp4_480p_format(video_formats)
+        if video_fmt:
+            return 'mp4', video_fmt, mp4_audio_fmt
+    return None, None, None # neither found
+
+def select_audio_format(video_formats):
+    # select between webm (preferred) and mp4
+    webm_audio_fmts = ['249', '250', '171', '251']
+    mp4_audio_fmts = ['139', '140', '141']
+    webm_audio_fmt = None
+    mp4_audio_fmt = None
+    for fmt in webm_audio_fmts:
+        if fmt in video_formats:
+            webm_audio_fmt = fmt
+            break
+    for fmt in mp4_audio_fmts:
+        if fmt in video_formats:
+            mp4_audio_fmt = fmt
+            break
+    return webm_audio_fmt, mp4_audio_fmt
+
+def select_webm_480p_format(video_formats):
+    # try known combinations
+    # find based on width
+    webm_video = ['244']
+    for fmt in webm_video:
+        if fmt in video_formats:
+            video_fmt = fmt
+            return video_fmt
+    return select_vid_format_by_width(video_formats, 'webm', 900)
+
+def select_mp4_480p_format(video_formats):
+    # find based on resolution
+    # try known combinations
+    video_fmt = select_vid_format_by_res(video_formats, 'mp4', '480p') # try by resolution
+    if video_fmt:
+        return video_fmt
+    video_fmt = select_vid_format_by_width(video_formats, 'mp4', 900) # try by width
+    if video_fmt:
+        return video_fmt
+    mp4_video = ['135'] # try by known format - but can return 240 x 480 instead of 853 x 480
+    for fmt in mp4_video:
+        if fmt in video_formats:
+            video_fmt = fmt
+            return video_fmt
+
+def select_vid_format_by_res(video_formats, selected_fmt, resolution):
+    video_fmt = None
+    for fmt in video_formats:
+        if video_formats[fmt]['ext'] != selected_fmt:
+            continue
+        if video_formats[fmt]['resolution'] == resolution:
+            video_fmt = fmt
+            break
+    return video_fmt
+
+def select_vid_format_by_width(video_formats, selected_fmt, max_width):
+    video_fmt = None
+    width = 0
+    for fmt in video_formats:
+        if video_formats[fmt]['ext'] != selected_fmt:
+            continue
+        if video_formats[fmt]['audio'] != None:
+            continue
+        fmt_width = video_formats[fmt]['width']
+        if fmt_width > max_width:
+            continue
+        if fmt_width > width:
+            width = fmt_width
+            video_fmt = fmt
+    return video_fmt
+
+def get_youtube_video_formats(video_info):
+    mp4_audio = ['139', '140', '141']
+    webm_audio = ['249', '250', '171', '251']
+    mp4_480p = '83'
+    webm_480p = '101'
+    video_formats = {}
+    formats = video_info['formats']
+    for fmt in formats:
+        id = fmt['format_id']
+        if id in mp4_audio:
+            audio = 'mp4'
+        elif id in webm_audio:
+            audio = 'webm'
+        else:
+            audio = None
+        video_formats[id] = {'ext': fmt['ext'], 'resolution': fmt['format_note'], 'width': fmt['width'], 'height': fmt['height'], 'audio': audio}
+    #return dict(sorted(video_formats.items()))
+    return video_formats
+
+def get_youtube_subtitles(video_info):
+    vtt_subs = []
+    subtitles = video_info['subtitles']
+    for sub in subtitles:
+        tracks = subtitles[sub]
+        for track in tracks:
+            #print (track['ext'])
+            if track['ext'] == 'vtt':
+                vtt_subs.append(sub)
+    return vtt_subs
+
+def dump_formats(video_id):
+    video_info = get_youtube_video_info(video_id)
+    video_formats = get_youtube_video_formats(video_info)
+    for id in video_formats:
+        print(id, video_formats[id])
+
+def get_youtube_video_info(video_id):
+    ydl_opts = {
+        'writesubtitles': True, #Adds a subtitles file if it exists
+        'writeautomaticsub': True, #Adds auto-generated subtitles file
+        'subtitle': '--write-sub --all-subs', #writes subtitles file in english
+        'subtitlesformat':'vtt', #writes the subtitles file in "srt" or "ass/srt/best"
+        'skip_download': True, #skips downloading the video file
+    }
+    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info('https://www.youtube.com/watch?v=' + video_id, download=False)
+    return info
+
+def download_youtube_video(video_id, video_format, download_dir):
+    # does video and poster
+    ydl_opts = {
+        'writethumbnail': True,
+        'format': video_format,
+        'outtmpl': download_dir + '/%(id)s.%(ext)s'
+    }
+    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+        ydl.download(['https://www.youtube.com/watch?v=' + video_id])
+
+def download_youtube_subs(video_id, download_dir):
+    # can't get YTDL api to work
+    # download all natural subtitles, not auto generated
+    if download_dir[-1] != '/':
+        download_dir += '/'
+    cmd = 'youtube-dl --skip-download --all-subs -o "' + download_dir + '%(id)s.%(ext)s" ' + video_id
+    subproc_run(cmd)
+
+def download_youtube_auto_sub(video_id, lang, download_dir):
+    # can't get YTDL api to work
+    # download one autogenerated sub
+    if download_dir[-1] != '/':
+        download_dir += '/'
+    cmd = 'youtube-dl --skip-download --write-auto-sub --sub-lang "' + lang + '" -o "' + download_dir + '%(id)s.%(ext)s" ' + video_id
+    subproc_run(cmd)
+
+def download_youtube_video_files(video_id, ydl_opts, download_dir):
+    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+        ydl.download(['https://www.youtube.com/watch?v=' + video_id])
+
+def calc_tag_struct(tag):
+    struct_string = ''
+    for parent in tag.parents:
+        if parent.name == 'body':
+            break
+        if parent is None:
+            print(parent)
+        else:
+             print(parent.name, parent.attrs)
+             struct_string = f'{parent.name} {parent.attrs} {struct_string}'
+    return struct_string
 
 # These are taken from adm cons adm_lib so as not require dependency
 def read_json_file(file_path):
