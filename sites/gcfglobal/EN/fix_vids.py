@@ -9,6 +9,7 @@ import argparse
 from urllib.parse import urljoin, urldefrag, urlparse
 import requests
 import youtube_dl
+import basicspider.sp_lib as sp
 
 import glob
 import iiab.adm_lib as adm
@@ -18,7 +19,10 @@ no249 = []
 no251 = []
 mp4_failed = []
 
-# list
+# all these assume we are in /Scrapes/gcf/<lang>/site-download/non-html/www.youtube.com
+
+# read json
+videos = adm.read_json('videos.json')
 
 # 249 audio
 ydl_opts = {'writethumbnail': False, 'format': '249', 'outtmpl': '249' + '/%(id)s.%(ext)s'}
@@ -59,6 +63,19 @@ for video_id in mp4:
 for video_id in videos:
     cmd = 'youtube-dl --skip-download --all-subs -o "embed/%(id)s.%(ext)s" ' + video_id
     adm.subproc_run(cmd)
+
+# autogen subtitles
+for video_id in videos:
+    if not os.path.exists('embed/' + video_id + '.en.vtt'):
+        if not os.path.exists('auto/' + video_id + '.auto.en.vtt'):
+            print (video_id + ' no en vtt')
+            sp.download_youtube_auto_sub(video_id, 'en', 'auto')
+
+# back out mistake
+for video_id in videos:
+    if os.path.exists('embed/' + video_id + '.en.vtt'):
+        if  os.path.exists('auto/' + video_id + '.auto.en.vtt'):
+            os.remove('auto/' + video_id + '.auto.en.vtt')
 
 # test subtitles
 subs = ['yJrpo4udXGU.ar.vtt',

@@ -1,5 +1,4 @@
 #!/usr/bin/python3
-from _typeshed import FileDescriptor
 import os, string, sys
 import copy
 import json
@@ -45,6 +44,7 @@ skip_from_course = 'https://edu.gcfglobal.org/en/basicspanishskills/'
 u1 = 'https://edu.gcfglobal.org/en/computerbasics/about-this-tutorial/1/'
 u2 = 'https://edu.gcfglobal.org/en/powerpoint2010/animating-text-and-objects/1/'
 u3 = 'https://edu.gcfglobal.org/en/youtube/troubleshooting-common-problems/1/'
+u4 = 'https://edu.gcfglobal.org/en/computerbasics/'
 
 c1 = 'https://edu.gcfglobal.org/en/computerbasics/'
 
@@ -62,7 +62,7 @@ def main(args):
         # stop when we reach indicated section of main index
         if course_index == SKIP_FROM_COURSE:
             break
-        #do_course(course_index)
+        do_course(course_index)
         pass
 
     page = do_top_index_page(top_url, page)
@@ -176,7 +176,14 @@ def do_course_index_page(url, page):
 
     main_content = page.find("div", id = 'content-area')
     #main_content['style'] = "width:960px; margin: 0 auto;" # because wrappers not included
-
+    # remove any Quiz as it uses js we can't support
+    lessons = main_content.find_all('ul', class_ = 'collection-items')
+    lesson_h3 = main_content.find_all('h3')
+    if lesson_h3[-1].text == 'Quiz':
+        print('Removing Quiz')
+        quiz = lesson_h3[-1].find_next_sibling('ul')
+        quiz.decompose()
+        lesson_h3[-1].decompose()
     logo_lines = BeautifulSoup(get_logo_lines(link=START_PAGE), 'html.parser')
     page.body.clear()
     page.body.append(logo_lines)
@@ -290,8 +297,10 @@ def get_youtube_video_block(video_link):
             vtt_subs = get_youtube_subtitles(video_info)
             if NATIVE_LANGUAGE in vtt_subs:
                 auto_gen = False
-            else:
+            elif NATIVE_LANGUAGE in video_info['automatic_captions']:
                 auto_gen = True
+            else:
+                auto_gen = False
             if video_format:
                 html = '<video controls width="853" height="480" class="mobile-video" '
                 video_link = urljoin(video_link, urlparse(video_link).path)
@@ -424,7 +433,7 @@ def handle_video_tag(video_tag, page_url):
     if 'www.youtube.com' in video_link or 'www.youtu.be' in video_link:
         is_youtube = True
         yt_format = video_tag.get('data-video-format') # custom attribute to save preferred format
-        yt_sub_gen = video_tag.get('data-sub-gen') # do we need to generate subtitles for native language
+        yt_sub_gen = video_tag.get('data-sub-gen') == 'True' # do we need to generate subtitles for native language
         # get youtube video, poster and subtitles
 
     if video_link:
@@ -462,7 +471,7 @@ def get_youtube_video(video_link, video_format, sub_gen):
     video_ext = video_name.split('.')[1]
 
     asset_file_name = url_to_file_name(video_link, 'video/' + video_ext, incl_query=False)
-    vtt_pattern = url_to_file_name(video_link, 'video/*vtt', incl_query=False) # fake a mime type to get pattern
+    vtt_pattern = asset_file_name.replace(video_ext, '*vtt')
     download_file_name = NON_HTML_DOWNLOAD_DIR + asset_file_name
     download_dir = os.path.dirname(download_file_name)
     print("getting", video_link, download_file_name)
