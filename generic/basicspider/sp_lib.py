@@ -228,6 +228,7 @@ def cleanup_url(url):
     Removes URL fragment that falsely make URLs look diffent.
     Subclasses can overload this method to perform other URL-normalizations.
     """
+    url = url.replace('\n','') # remove newlind within url
     url = urldefrag(url)[0]
     url_parts = urlparse(url)
     url_parts = url_parts._replace(path=url_parts.path.replace('//','/'))
@@ -369,7 +370,7 @@ def get_youtube_video_formats(video_info):
 
 def get_youtube_subtitles(video_info):
     vtt_subs = []
-    subtitles = video_info['subtitles']
+    subtitles = video_info.get('subtitles', [])
     for sub in subtitles:
         tracks = subtitles[sub]
         for track in tracks:

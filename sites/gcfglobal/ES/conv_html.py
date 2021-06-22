@@ -6,8 +6,10 @@ import re
 import string
 import argparse
 from urllib.parse import urljoin, urldefrag, urlparse
+import requests
 from bs4 import BeautifulSoup, Comment, SoupStrainer
 import youtube_dl
+from icu import UnicodeString, Locale
 from basicspider.sp_lib import *
 
 START_PAGE = 'https://edu.gcfglobal.org/es/topics/'
@@ -16,13 +18,19 @@ MAIN_SOURCE_DOMAIN = None
 HTML_INCL_PATTERNS = ['https://edu.gcfglobal.org/es/']
 HTML_EXCL_PATTERNS = []
 OUTPUT_FILE_PREFIX = 'site'
-DOWNLOAD_DIR = 'site-download/'
+
+HTML_DOWNLOAD_DIR = 'site-download/html/'
+NON_HTML_DOWNLOAD_DIR = 'site-download/es-non-html/'
 DOWNLOAD_ASSETS = True
 INCL_YOUTUBE = True
 PREF_YOUTUBE_FORMATS = ['244', '243', '135', '134', '18'] # 480p webm, etc.
 NO_VIDEO_MSG = 'Video no disponible'
+NATIVE_LANGUAGE = 'es'
 
-dst_dir = '/library/www/html/modules/es-GCF2021/'
+# Stop converting when this course is encountered
+SKIP_FROM_COURSE = 'https://idiomas.gcfglobal.org/es/curso/ingles/a1/'
+
+TARGET_DIR = '/library/www/html/modules/es-gcf_learn_2021/'
 external_url_not_found = '/not-offline.html'
 
 # read stats
@@ -41,6 +49,7 @@ u6 = 'https://edu.gcfglobal.org/es/programas-de-hojas-de-calculo/que-es-una-celd
 u7 = 'https://edu.gcfglobal.org/es/como-usar-whatsapp/configurar-la-descarga-automatica-de-archivos-en-whatsapp/1/' # <p>
 u8 = 'https://edu.gcfglobal.org/es/skype/configuracion-de-privacidad/1/' # no disponible
 u9 = 'https://edu.gcfglobal.org/es/como-funciona-la-nube/como-subir-un-archivo-a-onedrive/1/' # straggler
+u10 = 'https://edu.gcfglobal.org/es/educacion-virtual/notion-para-profesores/1/' # newline in url
 
 c1 = 'https://edu.gcfglobal.org/es/seguridad-en-internet/'
 c2 =  "https://edu.gcfglobal.org/es/excel-2016/"
@@ -57,6 +66,9 @@ def main(args):
     course_list = get_topic_list(page, top_url)
 
     for course_index in course_list:
+        # stop when we reach indicated section of main index
+        if course_index == SKIP_FROM_COURSE:
+            break
         do_course(course_index)
         pass
 
@@ -87,9 +99,15 @@ def do_top_index_page(top_url, page):
 
     # make topics headings not links
     topics = main_content.find_all('li', class_ = 'all-topics')
+    end_found = False
     for topic in topics:
-        heading = BeautifulSoup('<a>' + topic.a.text + '</a>', 'html.parser') # needs to be <a> not to break css
-        topic.a.replace_with(heading)
+        if topic.ul.li.span.a['href'] in SKIP_FROM_COURSE:
+            end_found = True
+        if end_found:
+            topic.decompose()
+        else:
+            heading = BeautifulSoup('<a>' + topic.a.text + '</a>', 'html.parser') # needs to be <a> not to break css
+            topic.a.replace_with(heading)
 
     logo_lines = BeautifulSoup(get_logo_lines(), 'html.parser')
 
@@ -143,18 +161,26 @@ def convert_page(url, page_type):
 def get_page(url):
     content_type = site_urls[url]['content-type']
     page_file_name = url_to_file_name(url, content_type)
-    input_file_path = DOWNLOAD_DIR + page_file_name
-
-    with open(input_file_path, 'r') as f: html = f.read()
+    input_file_path = HTML_DOWNLOAD_DIR + page_file_name
+    # if an html file has not been downloaded just go get it
+    if os.path.exists(input_file_path):
+        html = read_html_file(input_file_path)
+        # with open(input_file_path, 'r') as f: html = f.read()
+    else:
+        print ('Downloading missing url ' + url)
+        response = requests.get(url)
+        response.encoding = 'utf-8'
+        html = response.text
+        write_html_file(input_file_path, html)
 
     page = BeautifulSoup(html, "html5lib")
     return page, page_file_name
 
 def output_converted_page(page, page_file_name):
     html_output = page.encode_contents(formatter='html')
-    output_file_name = dst_dir + page_file_name
+    output_file_name = TARGET_DIR + page_file_name
 
-    write_html_file(output_file_name, html_output)
+    write_conv_html_file(output_file_name, html_output)
     print(output_file_name)
 
 def do_course_index_page(url, page):
@@ -162,6 +188,7 @@ def do_course_index_page(url, page):
 
     main_content = page.find("div", id = 'content-area')
     #main_content['style'] = "width:960px; margin: 0 auto;" # because wrappers not included
+    # remove any Quiz logic not needed for ES
 
     logo_lines = BeautifulSoup(get_logo_lines(link=START_PAGE), 'html.parser')
     page.body.clear()
@@ -212,7 +239,7 @@ def do_lesson_page(url, page):
     # just look for iframes
     iframes =  main_content.find_all("iframe")
     for ifr in iframes:
-        video_link = ifr.get('src')
+        video_link = cleanup_url(ifr.get('src'))
         if video_link:
             if '/www.youtube.com' in video_link or 'youtu.be' in video_link: # see if youtube
                 new_embed = get_youtube_video_block(video_link)
@@ -268,17 +295,55 @@ def get_youtube_video_block(video_link):
     embed_html += ' width: 853px; background-color: grey;vertical-align: middle; color: white;">' + NO_VIDEO_MSG + '</span>'
 
     if INCL_YOUTUBE:
-        video_ext, poster_ext, video_format = get_youtube_names(video_link, PREF_YOUTUBE_FORMATS) # 480p webm '244/243/135/134/18'
-        if video_format:
-            embed_html = '<video controls width="853" height="480" '
-            video_link = urljoin(video_link, urlparse(video_link).path)
-            video_src = 'src="' + video_link + video_ext + '" video-format="' + video_format + '" '
-            poster_src = 'poster="' + video_link + poster_ext + '"'
-            embed_html += video_src + poster_src + '></video>'
-
+        try: # all or nothing for now
+            video_id = urlparse(video_link).path.split('/')[-1].split('.')[0]
+            video_info = get_youtube_video_info(video_id)
+            video_formats = get_youtube_video_formats(video_info)
+            video_ext, video_fmt, audio_fmt = select_480p_format(video_formats)
+            video_format = video_fmt + '+' + audio_fmt
+            thumbnails = video_info['thumbnails']
+            poster_ext = thumbnails[-1]['url'].split('?')[0].split('.')[-1]
+            vtt_subs = get_youtube_subtitles(video_info)
+            if NATIVE_LANGUAGE in vtt_subs:
+                auto_gen = False
+            elif NATIVE_LANGUAGE in video_info.get('automatic_captions', []):
+                auto_gen = True
+            else:
+                auto_gen = False
+            if video_format:
+                html = '<video controls width="853" height="480" class="mobile-video" '
+                video_link = urljoin(video_link, urlparse(video_link).path)
+                video_src = 'src="' + video_link + '.' + video_ext + '" data-video-format="' + video_format + '" '
+                video_src += 'data-sub-langs="' +  ','.join(vtt_subs) + '" '
+                video_src += 'data-sub-gen="' +  str(auto_gen) + '" '
+                poster_src = 'poster="' + video_link + '.' + poster_ext + '"'
+                html += video_src + poster_src + '>'
+                if auto_gen:
+                    html += get_youtube_lang_track(video_link, NATIVE_LANGUAGE, auto=True)
+                for lang in vtt_subs:
+                    html += get_youtube_lang_track(video_link, lang)
+                html += '</video>'
+                embed_html = html
+        except:
+            print ('Error processing ' + video_link)
+            pass
     #print(embed_html)
     new_embed = BeautifulSoup(embed_html, 'html.parser')
     return new_embed
+
+def get_youtube_lang_track(video_link, lang, auto=False):
+    locale = Locale(lang)
+    lang_name =locale.getDisplayName(locale)
+    if auto:
+        auto_suffix = '.auto'
+    else:
+        auto_suffix = ''
+    html = '<track '
+    html += 'label="' + lang_name + '" kind="subtitles" srclang="' + lang + '" src="' + video_link + auto_suffix + '.' + lang + '.vtt"'
+    if lang == NATIVE_LANGUAGE:
+        html += ' mode="showing" default'
+    html += '>\n'
+    return html
 
 def handle_page_links(page, page_url):
     # calculate links relative to current page path
@@ -358,24 +423,31 @@ def handle_page_links(page, page_url):
                     tag = handle_video_tag(tag, page_url)
             elif tag.name == 'source':
                 tag = handle_video_tag(tag, page_url)
+            elif tag.name == 'track':
+                print(tag)
+                if tag.get('src'):
+                    tag['src'] = convert_link(page_url, tag['src'])
             else:
                 print('Unhandled tag', tag.name)
     return page
 
 def handle_video_tag(video_tag, page_url):
-    # need to handle source sub tag
+    # need to handle nested source tag
+    # subtitle tracks src links are converted above
+    # subtitle tracks download (including autogen) is part of get_youtube_video
     video_link = video_tag.get('src')
     poster_link = video_tag.get('poster')
     is_youtube = False
 
     if 'www.youtube.com' in video_link or 'www.youtu.be' in video_link:
         is_youtube = True
-        yt_format = video_tag.get('video-format') # custom attribute to save preferred format
+        yt_format = video_tag.get('data-video-format') # custom attribute to save preferred format
+        yt_sub_gen = video_tag.get('data-sub-gen') == 'True' # do we need to generate subtitles for native language
         # get youtube video and poster
 
     if video_link:
         if is_youtube:
-            get_youtube_video(video_link, yt_format)
+            get_youtube_video(video_link, yt_format, yt_sub_gen)
             video_tag['src'] = convert_link(page_url, video_link)
         else:
             get_site_media_asset(page_url, video_link)
@@ -383,9 +455,14 @@ def handle_video_tag(video_tag, page_url):
 
     if poster_link:
         video_tag['poster'] = convert_link(page_url, poster_link)
-        if not is_youtube: # poster comes with video in youtube
+        if is_youtube: # poster comes with video in youtube
+            poster_file_name = url_to_file_name(poster_link, None, incl_query=False) # assume it has an extension
+            download_file_name = NON_HTML_DOWNLOAD_DIR + poster_file_name # and already downloaded
+            dst_file = TARGET_DIR + poster_file_name
+            if not os.path.exists(dst_file):
+                copy_downloaded_file(download_file_name, dst_file)
+        else:
             get_site_media_asset(page_url, poster_link)
-
     return video_tag
 
 def get_site_media_asset(page_url, url):
@@ -393,9 +470,9 @@ def get_site_media_asset(page_url, url):
     link_type = site_urls.get(abs_url,{}).get('content-type', None)
     get_site_asset(url, link_type)
 
-def get_youtube_video(video_link, video_format):
-    # gets both video and poster
-    # formats must be list of one or more format ids in order of preference
+def get_youtube_video(video_link, video_format, sub_gen):
+    # gets video, poster, and any subtitles including autogen
+    # formats were precalculated
     # returns url including extension
 
     video_name = urlparse(video_link).path.split('/')[-1]
@@ -403,48 +480,22 @@ def get_youtube_video(video_link, video_format):
     video_ext = video_name.split('.')[1]
 
     asset_file_name = url_to_file_name(video_link, 'video/' + video_ext, incl_query=False)
-    output_file_name = dst_dir + asset_file_name
-    output_dir = output_dir = os.path.dirname(output_file_name)
-    print("getting", video_link, output_file_name)
+    vtt_pattern = asset_file_name.replace(video_ext, '*vtt')
+    download_file_name = NON_HTML_DOWNLOAD_DIR + asset_file_name
+    download_dir = os.path.dirname(download_file_name)
+    print("getting", video_link, download_file_name)
     # https://github.com/ytdl-org/youtube-dl/blob/master/README.md#embedding-youtube-dl
-    if not os.path.exists(output_file_name):
-        ydl_opts = {'writethumbnail': True, 'format': video_format, 'outtmpl': output_dir + '/%(id)s.%(ext)s'} # %(format_id)s
-        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-            ydl.download(['https://www.youtube.com/watch?v=' + video_id])
+    if not os.path.exists(download_file_name):
+        download_youtube_video(video_id, video_format, download_dir) # video and poster
+        download_youtube_subs(video_id, download_dir) # native subtitles
+        if sub_gen:
+            download_youtube_auto_sub(video_id, NATIVE_LANGUAGE, download_dir) # one generated subtitle
 
-def get_youtube_names(video_link, pref_formats):
-    video_id = urlparse(video_link).path.split('/')[-1].split('.')[0]
-
-    try:
-        act_formats, act_thumbnails = get_youtube_video_formats(video_id)
-    except:
-        return None, None, None
-
-    format = None
-    for fmt in pref_formats: # list of format ids
-        if fmt in act_formats:
-            format = fmt
-            video_ext = act_formats[fmt]['ext']
-            break
-    if not format:
-        print('No matching video format found for ' + video_id)
-        return None, None, None
-    #else:
-    thumb_ext = act_thumbnails[-1] # last is maxresdefault
-    thumb_ext = act_thumbnails[-1]['url'].split('?')[0].split('.')[-1]
-    return '.' + video_ext, '.' +  thumb_ext, format
-
-def get_youtube_video_formats(video_id):
-    video_formats = {}
-    ydl = youtube_dl.YoutubeDL()
-    ydl.add_default_info_extractors()
-    info = ydl.extract_info('http://www.youtube.com/watch?v=' + video_id, download=False)
-    formats = info['formats']
-    thumbnails = info['thumbnails']
-    # is array with 'format_id', 'ext', 'width', 'height', and 'format' (description); also has duration
-    for fmt in formats:
-        video_formats[fmt['format_id']] = {'ext':fmt['ext'], 'width':fmt['width'], 'height': fmt['height']}
-    return video_formats, thumbnails
+    dst_file = TARGET_DIR + asset_file_name
+    dst_dir = os.path.dirname(dst_file)
+    if not os.path.exists(dst_file):
+        copy_downloaded_file(download_file_name, dst_file)
+        copy_multiple_files(NON_HTML_DOWNLOAD_DIR + vtt_pattern, dst_dir) # do subtitle files
 
 def is_link_included(url):
     # check if link matches patterns to include
@@ -497,7 +548,7 @@ def convert_link(base_url, href):
             print('Unknown URL ' + href_url + ' not in site_urls')
             return None
 
-def write_html_file(output_file_name, html_output):
+def write_conv_html_file(output_file_name, html_output):
     output_dir = os.path.dirname(output_file_name)
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -508,10 +559,14 @@ def get_site_asset(url, content_type):
     if not DOWNLOAD_ASSETS:
         return
     asset_file_name = url_to_file_name(url, content_type)
-    output_file_name = dst_dir + asset_file_name
-    print("getting", url, output_file_name)
-    if not os.path.exists(output_file_name):
-        download_binary_url(url, output_file_name)
+    download_file_name = NON_HTML_DOWNLOAD_DIR + asset_file_name
+    print("getting", url, download_file_name)
+    if not os.path.exists(download_file_name):
+        download_binary_url(url, download_file_name)
+    dst_file = TARGET_DIR + asset_file_name
+    if not os.path.exists(dst_file):
+        if os.path.exists(download_file_name): # in case could not be downloaded or doesn't exist at source
+            copy_downloaded_file(download_file_name, dst_file)
 
 def get_course_index_head_lines():
     head_lines = '''
@@ -538,6 +593,12 @@ def get_head_lines():
     #content-area {
     width: 960px;
     margin: 0 auto;
+    }
+    }
+    @media only screen and (max-width :960px){
+    .mobile-video{
+    height: auto !important;
+    width: 100% !important;
     }
     }
     </style>

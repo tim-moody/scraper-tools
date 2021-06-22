@@ -87,14 +87,20 @@ def get_topic_list(index_page, index_url):
 def do_top_index_page(top_url, page):
     page = scrub_header(page)
 
-    title_div = BeautifulSoup('<div class="title-content"><h1>Todos los cursos</h1></div>', 'html.parser')
+    title_div = BeautifulSoup('<div class="title-content"><h1>All Topics</h1></div>', 'html.parser')
     main_content = page.find('ul', class_ = 'all-topics')
 
     # make topics headings not links
     topics = main_content.find_all('li', class_ = 'all-topics')
+    end_found = False
     for topic in topics:
-        heading = BeautifulSoup('<a>' + topic.a.text + '</a>', 'html.parser') # needs to be <a> not to break css
-        topic.a.replace_with(heading)
+        if topic.ul.li.span.a['href'] in SKIP_FROM_COURSE:
+            end_found = True
+        if end_found:
+            topic.decompose()
+        else:
+            heading = BeautifulSoup('<a>' + topic.a.text + '</a>', 'html.parser') # needs to be <a> not to break css
+            topic.a.replace_with(heading)
 
     logo_lines = BeautifulSoup(get_logo_lines(), 'html.parser')
 
@@ -105,8 +111,8 @@ def do_top_index_page(top_url, page):
     page.body.div.append(title_div)
     page.body.div.append(main_content)
 
-    head_html = '<link rel="stylesheet" href="https://edu.gcfglobal.org/styles/deployment-es/alltopics.concat.css">'
-    head_html += '<script src="https://edu.gcfglobal.org/scripts/deployment-es/alltopics.concat.js" type="text/javascript"></script>'
+    head_html = '<link rel="stylesheet" href="https://edu.gcfglobal.org/styles/deployment-en/alltopics.concat.css">'
+    head_html += '<script src="https://edu.gcfglobal.org/scripts/deployment-en/alltopics.concat.js" type="text/javascript"></script>'
     head_lines = BeautifulSoup(head_html, 'html.parser')
 
     bottom_lines = BeautifulSoup(get_bottom_lines(), 'html.parser')
@@ -179,7 +185,7 @@ def do_course_index_page(url, page):
     # remove any Quiz as it uses js we can't support
     lessons = main_content.find_all('ul', class_ = 'collection-items')
     lesson_h3 = main_content.find_all('h3')
-    if lesson_h3[-1].text == 'Quiz':
+    if lesson_h3 and lesson_h3[-1].text == 'Quiz':
         print('Removing Quiz')
         quiz = lesson_h3[-1].find_next_sibling('ul')
         quiz.decompose()
@@ -233,7 +239,7 @@ def do_lesson_page(url, page):
     # just look for iframes
     iframes =  main_content.find_all("iframe")
     for ifr in iframes:
-        video_link = ifr.get('src')
+        video_link = cleanup_url(ifr.get('src'))
         if video_link:
             if '/www.youtube.com' in video_link or 'youtu.be' in video_link: # see if youtube
                 new_embed = get_youtube_video_block(video_link)
@@ -286,7 +292,7 @@ def get_youtube_video_block(video_link):
     embed_html = '<span style="margin: auto; padding-top: 225px; padding-bottom: 225px; padding-left: 335px; padding-right: 335px; line-height: 480px;'
     embed_html += ' width: 853px; background-color: grey;vertical-align: middle; color: white;">' + NO_VIDEO_MSG + '</span>'
     if INCL_YOUTUBE:
-        #try: # all or nothing for now
+        try: # all or nothing for now
             video_id = urlparse(video_link).path.split('/')[-1].split('.')[0]
             video_info = get_youtube_video_info(video_id)
             video_formats = get_youtube_video_formats(video_info)
@@ -297,7 +303,7 @@ def get_youtube_video_block(video_link):
             vtt_subs = get_youtube_subtitles(video_info)
             if NATIVE_LANGUAGE in vtt_subs:
                 auto_gen = False
-            elif NATIVE_LANGUAGE in video_info['automatic_captions']:
+            elif NATIVE_LANGUAGE in video_info.get('automatic_captions', []):
                 auto_gen = True
             else:
                 auto_gen = False
@@ -315,10 +321,10 @@ def get_youtube_video_block(video_link):
                     html += get_youtube_lang_track(video_link, lang)
                 html += '</video>'
                 embed_html = html
-        #except:
-        #    print ('Error processing ' + video_link)
-        #    pass
-    print(embed_html)
+        except:
+            print ('Error processing ' + video_link)
+            pass
+    #print(embed_html)
     new_embed = BeautifulSoup(embed_html, 'html.parser')
     return new_embed
 
@@ -561,7 +567,7 @@ def get_site_asset(url, content_type):
 
 def get_course_index_head_lines():
     head_lines = '''
-    <link rel="stylesheet" href="https://edu.gcfglobal.org/styles/deployment-es/tutorial.concat.css">
+    <link rel="stylesheet" href="https://edu.gcfglobal.org/styles/deployment-en/tutorial.concat.css">
 
     <style>
     @media only screen and (min-width: 960px) {
@@ -572,13 +578,13 @@ def get_course_index_head_lines():
     }
     </style>
     '''
-    #<link rel="stylesheet" href="https://edu.gcfglobal.org/styles/deployment-es/alltopics.concat.css">
-    #<script src="https://edu.gcfglobal.org/scripts/deployment-es/alltopics.concat.js" type="text/javascript"></script>
+    #<link rel="stylesheet" href="https://edu.gcfglobal.org/styles/deployment-en/alltopics.concat.css">
+    #<script src="https://edu.gcfglobal.org/scripts/deployment-en/alltopics.concat.js" type="text/javascript"></script>
     return head_lines
 
 def get_head_lines():
     head_lines = '''
-    <link rel="stylesheet" href="https://edu.gcfglobal.org/styles/deployment-es/lessonpage-es.concat.css">
+    <link rel="stylesheet" href="https://edu.gcfglobal.org/styles/deployment-en/lessonpage-en.concat.css">
     <style>
     @media only screen and (min-width: 960px) {
     #content-area {
@@ -599,9 +605,9 @@ def get_head_lines():
 def get_logo_lines(link='#'):
     logo_lines = '<div style="margin-left:20px;">'
     logo_lines += '<a class="logo-link" href="' + START_PAGE + '">'
-    logo_lines += '<img style="height:50px;" class="logo logo-left main-logo-es" src="/assets/gcfglobal-color.png"></a>'
+    logo_lines += '<img style="height:50px;" class="logo logo-left main-logo-en" src="/assets/gcfglobal-color.png"></a>'
     logo_lines += '<a class="logo-link" href="' + link + '">'
-    logo_lines += '<img style="height:60px;" class="logo logo-middle logo-es" src="/assets/logo-es.svg"></a>'
+    logo_lines += '<img style="height:60px;" class="logo logo-middle logo-en" src="/assets/logo.png"></a>'
     logo_lines += '</div>'
 
     return logo_lines
