@@ -77,6 +77,21 @@ for video_id in videos:
         if  os.path.exists('auto/' + video_id + '.auto.en.vtt'):
             os.remove('auto/' + video_id + '.auto.en.vtt')
 
+# es vs es-419
+for video_id in videos:
+    if os.path.exists('embed/' + video_id + '.es-419.vtt'):
+        if os.path.exists('auto/' + video_id + '.es.vtt'):
+            print(video_id)
+
+for video_id in videos:
+    if os.path.exists('embed/' + video_id + '.es-419.vtt'):
+        continue
+    if os.path.exists('embed/' + video_id + '.es.vtt'):
+        continue
+    if os.path.exists('embed/' + video_id + '.auto.es.vtt'):
+        continue
+    sp.download_youtube_auto_sub(video_id, 'es', 'auto')
+
 # test subtitles
 subs = ['yJrpo4udXGU.ar.vtt',
 'yJrpo4udXGU.cs.vtt',
