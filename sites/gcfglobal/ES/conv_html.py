@@ -25,7 +25,7 @@ DOWNLOAD_ASSETS = True
 INCL_YOUTUBE = True
 PREF_YOUTUBE_FORMATS = ['244', '243', '135', '134', '18'] # 480p webm, etc.
 NO_VIDEO_MSG = 'Video no disponible'
-NATIVE_LANGUAGE = 'es'
+CC_DEFAULTS = ['es', 'es-419']
 
 # Stop converting when this course is encountered
 SKIP_FROM_COURSE = 'https://idiomas.gcfglobal.org/es/curso/ingles/a1/'
@@ -304,24 +304,36 @@ def get_youtube_video_block(video_link):
             thumbnails = video_info['thumbnails']
             poster_ext = thumbnails[-1]['url'].split('?')[0].split('.')[-1]
             vtt_subs = get_youtube_subtitles(video_info)
-            if NATIVE_LANGUAGE in vtt_subs:
+            cc_default_lang = None
+            auto_sub_lang = None
+            auto_gen = True
+            for lang in CC_DEFAULTS:
+                if lang in vtt_subs: # found a default lang, no need for auto gen
+                    auto_gen = False
+                    cc_default_lang = lang
+                    break
+            if auto_gen:
+                for lang in CC_DEFAULTS:
+                    if lang in video_info.get('automatic_captions', []): # found an auto gen lang
+                        auto_sub_lang = lang
+                        cc_default_lang = lang
+                        break
+            if not auto_sub_lang: # no lang to generate
                 auto_gen = False
-            elif NATIVE_LANGUAGE in video_info.get('automatic_captions', []):
-                auto_gen = True
-            else:
-                auto_gen = False
+
             if video_format:
                 html = '<video controls width="853" height="480" class="mobile-video" '
                 video_link = urljoin(video_link, urlparse(video_link).path)
                 video_src = 'src="' + video_link + '.' + video_ext + '" data-video-format="' + video_format + '" '
                 video_src += 'data-sub-langs="' +  ','.join(vtt_subs) + '" '
                 video_src += 'data-sub-gen="' +  str(auto_gen) + '" '
+                video_src += 'data-sub-lang="' +  str(auto_sub_lang) + '" '
                 poster_src = 'poster="' + video_link + '.' + poster_ext + '"'
                 html += video_src + poster_src + '>'
                 if auto_gen:
-                    html += get_youtube_lang_track(video_link, NATIVE_LANGUAGE, auto=True)
+                    html += get_youtube_lang_track(video_link, auto_sub_lang, cc_default_lang, auto=True)
                 for lang in vtt_subs:
-                    html += get_youtube_lang_track(video_link, lang)
+                    html += get_youtube_lang_track(video_link, lang, cc_default_lang)
                 html += '</video>'
                 embed_html = html
         except:
@@ -331,7 +343,7 @@ def get_youtube_video_block(video_link):
     new_embed = BeautifulSoup(embed_html, 'html.parser')
     return new_embed
 
-def get_youtube_lang_track(video_link, lang, auto=False):
+def get_youtube_lang_track(video_link, lang, cc_default_lang, auto=False):
     locale = Locale(lang)
     lang_name =locale.getDisplayName(locale)
     if auto:
@@ -340,7 +352,7 @@ def get_youtube_lang_track(video_link, lang, auto=False):
         auto_suffix = ''
     html = '<track '
     html += 'label="' + lang_name + '" kind="subtitles" srclang="' + lang + '" src="' + video_link + auto_suffix + '.' + lang + '.vtt"'
-    if lang == NATIVE_LANGUAGE:
+    if lang == cc_default_lang:
         html += ' mode="showing" default'
     html += '>\n'
     return html
@@ -443,11 +455,12 @@ def handle_video_tag(video_tag, page_url):
         is_youtube = True
         yt_format = video_tag.get('data-video-format') # custom attribute to save preferred format
         yt_sub_gen = video_tag.get('data-sub-gen') == 'True' # do we need to generate subtitles for native language
+        yt_sub_lang = video_tag.get('data-sub-lang')
         # get youtube video and poster
 
     if video_link:
         if is_youtube:
-            get_youtube_video(video_link, yt_format, yt_sub_gen)
+            get_youtube_video(video_link, yt_format, NON_HTML_DOWNLOAD_DIR, TARGET_DIR, yt_sub_gen, yt_sub_lang)
             video_tag['src'] = convert_link(page_url, video_link)
         else:
             get_site_media_asset(page_url, video_link)
@@ -470,7 +483,7 @@ def get_site_media_asset(page_url, url):
     link_type = site_urls.get(abs_url,{}).get('content-type', None)
     get_site_asset(url, link_type)
 
-def get_youtube_video(video_link, video_format, sub_gen):
+def get_youtube_video(video_link, video_format, download_dir, target_dir, cc_auto_gen, cc_auto_lang):
     # gets video, poster, and any subtitles including autogen
     # formats were precalculated
     # returns url including extension
@@ -481,21 +494,21 @@ def get_youtube_video(video_link, video_format, sub_gen):
 
     asset_file_name = url_to_file_name(video_link, 'video/' + video_ext, incl_query=False)
     vtt_pattern = asset_file_name.replace(video_ext, '*vtt')
-    download_file_name = NON_HTML_DOWNLOAD_DIR + asset_file_name
+    download_file_name = download_dir + asset_file_name
     download_dir = os.path.dirname(download_file_name)
     print("getting", video_link, download_file_name)
     # https://github.com/ytdl-org/youtube-dl/blob/master/README.md#embedding-youtube-dl
     if not os.path.exists(download_file_name):
         download_youtube_video(video_id, video_format, download_dir) # video and poster
         download_youtube_subs(video_id, download_dir) # native subtitles
-        if sub_gen:
-            download_youtube_auto_sub(video_id, NATIVE_LANGUAGE, download_dir) # one generated subtitle
+        if cc_auto_gen:
+            download_youtube_auto_sub(video_id, cc_auto_lang, download_dir) # one generated subtitle
 
-    dst_file = TARGET_DIR + asset_file_name
+    dst_file = target_dir + asset_file_name
     dst_dir = os.path.dirname(dst_file)
     if not os.path.exists(dst_file):
         copy_downloaded_file(download_file_name, dst_file)
-        copy_multiple_files(NON_HTML_DOWNLOAD_DIR + vtt_pattern, dst_dir) # do subtitle files
+        copy_multiple_files(download_dir + vtt_pattern, dst_dir) # do subtitle files
 
 def is_link_included(url):
     # check if link matches patterns to include
