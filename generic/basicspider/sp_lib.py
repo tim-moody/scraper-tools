@@ -11,6 +11,7 @@ import shlex
 import subprocess
 from urllib.parse import urljoin, urldefrag, urlparse
 import youtube_dl
+from icu import UnicodeString, Locale
 
 def download_urls(url_list, content_type, dest_dir, refresh=False):
     # handles a single content type
@@ -397,6 +398,32 @@ def get_youtube_video_info(video_id):
         info = ydl.extract_info('https://www.youtube.com/watch?v=' + video_id, download=False)
     return info
 
+def get_youtube_video(video_link, video_format, download_dir, target_dir, cc_auto_gen, cc_auto_lang):
+    # gets video, poster, and any subtitles including autogen
+    # formats were precalculated
+    # returns url including extension
+    # copies video and subtitle files to dest' poster copied elsewhere
+
+    video_name = urlparse(video_link).path.split('/')[-1]
+    video_id = video_name.split('.')[0]
+    video_ext = video_name.split('.')[1]
+
+    asset_file_name = url_to_file_name(video_link, 'video/' + video_ext, incl_query=False)
+    vtt_pattern = asset_file_name.replace(video_ext, '*vtt')
+    download_file_name = download_dir + asset_file_name
+    yt_download_dir = os.path.dirname(download_file_name)
+    if not os.path.exists(download_file_name):
+        download_youtube_video(video_id, video_format, yt_download_dir) # video and poster
+        download_youtube_subs(video_id, yt_download_dir) # native subtitles
+        if cc_auto_gen:
+            download_youtube_auto_sub(video_id, cc_auto_lang, yt_download_dir) # one generated subtitle
+
+    dst_file = target_dir + asset_file_name
+    dst_dir = os.path.dirname(dst_file)
+    if not os.path.exists(dst_file):
+        copy_downloaded_file(download_file_name, dst_file) # copy video file to dest
+        copy_multiple_files(download_dir + vtt_pattern, dst_dir) # copy subtitle files to dest
+
 def download_youtube_video(video_id, video_format, download_dir):
     # does video and poster
     ydl_opts = {
@@ -438,6 +465,64 @@ def calc_tag_struct(tag):
              print(parent.name, parent.attrs)
              struct_string = f'{parent.name} {parent.attrs} {struct_string}'
     return struct_string
+
+def calc_youtube_video_block(video_link, cc_defaults):
+    html = None
+    video_link = urljoin(video_link, urlparse(video_link).path)
+    video_id = urlparse(video_link).path.split('/')[-1].split('.')[0]
+    video_info = get_youtube_video_info(video_id)
+    video_formats = get_youtube_video_formats(video_info)
+    video_ext, video_fmt, audio_fmt = select_480p_format(video_formats)
+    video_format = video_fmt + '+' + audio_fmt
+    thumbnails = video_info['thumbnails']
+    poster_ext = thumbnails[-1]['url'].split('?')[0].split('.')[-1]
+    vtt_subs = get_youtube_subtitles(video_info)
+    cc_default_lang = None
+    auto_sub_lang = None
+    auto_gen = True
+    for lang in cc_defaults:
+        if lang in vtt_subs: # found a default lang, no need for auto gen
+            auto_gen = False
+            cc_default_lang = lang
+            break
+    if auto_gen:
+        for lang in cc_defaults:
+            if lang in video_info.get('automatic_captions', []): # found an auto gen lang
+                auto_sub_lang = lang
+                cc_default_lang = lang
+                break
+    if not auto_sub_lang: # no lang to generate
+        auto_gen = False
+
+    if video_format:
+        html = '<video controls width="853" height="480" class="mobile-video" '
+        video_link = urljoin(video_link, urlparse(video_link).path)
+        video_src = 'src="' + video_link + '.' + video_ext + '" data-video-format="' + video_format + '" '
+        video_src += 'data-sub-langs="' +  ','.join(vtt_subs) + '" '
+        video_src += 'data-sub-gen="' +  str(auto_gen) + '" '
+        video_src += 'data-sub-lang="' +  str(auto_sub_lang) + '" '
+        poster_src = 'poster="' + video_link + '.' + poster_ext + '"'
+        html += video_src + poster_src + '>'
+        if auto_gen:
+            html += calc_youtube_lang_track(video_link, auto_sub_lang, cc_default_lang, auto=True)
+        for lang in vtt_subs:
+            html += calc_youtube_lang_track(video_link, lang, cc_default_lang)
+        html += '</video>'
+    return html
+
+def calc_youtube_lang_track(video_link, lang, cc_default_lang, auto=False):
+    locale = Locale(lang)
+    lang_name =locale.getDisplayName(locale)
+    if auto:
+        auto_suffix = '.auto'
+    else:
+        auto_suffix = ''
+    html = '<track '
+    html += 'label="' + lang_name + '" kind="subtitles" srclang="' + lang + '" src="' + video_link + auto_suffix + '.' + lang + '.vtt"'
+    if lang == cc_default_lang:
+        html += ' mode="showing" default'
+    html += '>\n'
+    return html
 
 # These are taken from adm cons adm_lib so as not require dependency
 def read_json_file(file_path):

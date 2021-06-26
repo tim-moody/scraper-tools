@@ -92,6 +92,17 @@ for video_id in videos:
         continue
     sp.download_youtube_auto_sub(video_id, 'es', 'auto')
 
+# for pt
+for video_id in videos:
+    if os.path.exists('embed/' + video_id + '.pt.vtt'):
+        continue
+    if os.path.exists('embed/' + video_id + '.pt-BR.vtt'):
+        continue
+    if os.path.exists('embed/' + video_id + '.auto.pt.vtt'):
+        continue
+    sp.download_youtube_auto_sub(video_id, 'pt', 'auto-vtt')
+
+
 # test subtitles
 subs = ['yJrpo4udXGU.ar.vtt',
 'yJrpo4udXGU.cs.vtt',
