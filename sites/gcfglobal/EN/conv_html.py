@@ -24,21 +24,19 @@ DOWNLOAD_ASSETS = True
 INCL_YOUTUBE = True
 # PREF_YOUTUBE_FORMATS = ['244', '243', '135', '134', '18'] # 480p webm, etc.
 NO_VIDEO_MSG = 'Video not available'
-NATIVE_LANGUAGE = 'en'
+CC_DEFAULTS = ['en', 'en-GB']
 
 # Stop converting when this course is encountered
 SKIP_FROM_COURSE = 'https://edu.gcfglobal.org/en/basicspanishskills/'
 
 TARGET_DIR = '/library/www/html/modules/en-gcf_learn_2021/'
-external_url_not_found = '/not-offline.html'
+EXTERNAL_URL_NOT_FOUND = 'https://edu.gcfglobal.org/en/not-offline.html' # this is a pseudo url
 
 # read stats
 site_urls = read_json_file(OUTPUT_FILE_PREFIX + '_urls.json')
 site_redirects = read_json_file(OUTPUT_FILE_PREFIX + '_redirects.json')
 
 page_links = {}
-
-skip_from_course = 'https://edu.gcfglobal.org/en/basicspanishskills/'
 
 # for test
 u1 = 'https://edu.gcfglobal.org/en/computerbasics/about-this-tutorial/1/'
@@ -54,6 +52,7 @@ def main(args):
         DOWNLOAD_ASSETS = False
 
     top_url = START_PAGE
+    copy_external_html_file(EXTERNAL_URL_NOT_FOUND)
 
     page, page_file_name = get_page(top_url)
     course_list = get_topic_list(page, top_url)
@@ -289,58 +288,21 @@ def get_youtube_video_block(video_link):
     # video extension needs to agree with what get_youtube_video downloads
     # this is based on the format
     # same for poster extension
+
+    video_link = urljoin(video_link, urlparse(video_link).path)
     embed_html = '<span style="margin: auto; padding-top: 225px; padding-bottom: 225px; padding-left: 335px; padding-right: 335px; line-height: 480px;'
     embed_html += ' width: 853px; background-color: grey;vertical-align: middle; color: white;">' + NO_VIDEO_MSG + '</span>'
+
     if INCL_YOUTUBE:
-        try: # all or nothing for now
-            video_id = urlparse(video_link).path.split('/')[-1].split('.')[0]
-            video_info = get_youtube_video_info(video_id)
-            video_formats = get_youtube_video_formats(video_info)
-            video_ext, video_fmt, audio_fmt = select_480p_format(video_formats)
-            video_format = video_fmt + '+' + audio_fmt
-            thumbnails = video_info['thumbnails']
-            poster_ext = thumbnails[-1]['url'].split('?')[0].split('.')[-1]
-            vtt_subs = get_youtube_subtitles(video_info)
-            if NATIVE_LANGUAGE in vtt_subs:
-                auto_gen = False
-            elif NATIVE_LANGUAGE in video_info.get('automatic_captions', []):
-                auto_gen = True
-            else:
-                auto_gen = False
-            if video_format:
-                html = '<video controls width="853" height="480" class="mobile-video" '
-                video_link = urljoin(video_link, urlparse(video_link).path)
-                video_src = 'src="' + video_link + '.' + video_ext + '" data-video-format="' + video_format + '" '
-                video_src += 'data-sub-langs="' +  ','.join(vtt_subs) + '" '
-                video_src += 'data-sub-gen="' +  str(auto_gen) + '" '
-                poster_src = 'poster="' + video_link + '.' + poster_ext + '"'
-                html += video_src + poster_src + '>'
-                if auto_gen:
-                    html += get_youtube_lang_track(video_link, NATIVE_LANGUAGE, auto=True)
-                for lang in vtt_subs:
-                    html += get_youtube_lang_track(video_link, lang)
-                html += '</video>'
-                embed_html = html
+        try:
+            video_block = calc_youtube_video_block(video_link, CC_DEFAULTS)
+            if video_block:
+                embed_html = video_block
         except:
-            print ('Error processing ' + video_link)
-            pass
+            pass # if there is an error use the default html above
     #print(embed_html)
     new_embed = BeautifulSoup(embed_html, 'html.parser')
     return new_embed
-
-def get_youtube_lang_track(video_link, lang, auto=False):
-    locale = Locale(lang)
-    lang_name =locale.getDisplayName(locale)
-    if auto:
-        auto_suffix = '.auto'
-    else:
-        auto_suffix = ''
-    html = '<track '
-    html += 'label="' + lang_name + '" kind="subtitles" srclang="' + lang + '" src="' + video_link + auto_suffix + '.' + lang + '.vtt"'
-    if lang == NATIVE_LANGUAGE:
-        html += ' mode="showing" default'
-    html += '>\n'
-    return html
 
 def handle_page_links(page, page_url):
     # calculate links relative to current page path
@@ -373,7 +335,7 @@ def handle_page_links(page, page_url):
         # if type not text get the asset
         link_type = site_urls.get(href,{}).get('content-type', None)
         save_href = href
-        external_url = external_url_not_found + '?url=' + href
+        external_url = EXTERNAL_URL_NOT_FOUND + '?url=' + href
 
         if not link_type:
             href = external_url
@@ -407,7 +369,7 @@ def handle_page_links(page, page_url):
                 tag[attr] = attr_path
 
                 link_type = site_urls.get(abs_url,{}).get('content-type', None)
-                if link_type:
+                if link_type or tag.name == 'img': # let pseudo and outside images through
                     get_site_asset(abs_url, link_type)
                 else:
                     # this could be file not from source so not in site_urls
@@ -440,11 +402,12 @@ def handle_video_tag(video_tag, page_url):
         is_youtube = True
         yt_format = video_tag.get('data-video-format') # custom attribute to save preferred format
         yt_sub_gen = video_tag.get('data-sub-gen') == 'True' # do we need to generate subtitles for native language
+        yt_sub_lang = video_tag.get('data-sub-lang')
         # get youtube video, poster and subtitles
 
     if video_link:
         if is_youtube:
-            get_youtube_video(video_link, yt_format, yt_sub_gen)
+            get_youtube_video(video_link, yt_format, NON_HTML_DOWNLOAD_DIR, TARGET_DIR, yt_sub_gen, yt_sub_lang)
             video_tag['src'] = convert_link(page_url, video_link)
         else:
             get_site_media_asset(page_url, video_link)
@@ -466,33 +429,6 @@ def get_site_media_asset(page_url, url):
     abs_url = urljoin(page_url, url)
     link_type = site_urls.get(abs_url,{}).get('content-type', None)
     get_site_asset(url, link_type)
-
-def get_youtube_video(video_link, video_format, sub_gen):
-    # gets video, poster, and any subtitles including autogen
-    # formats were precalculated
-    # returns url including extension
-
-    video_name = urlparse(video_link).path.split('/')[-1]
-    video_id = video_name.split('.')[0]
-    video_ext = video_name.split('.')[1]
-
-    asset_file_name = url_to_file_name(video_link, 'video/' + video_ext, incl_query=False)
-    vtt_pattern = asset_file_name.replace(video_ext, '*vtt')
-    download_file_name = NON_HTML_DOWNLOAD_DIR + asset_file_name
-    download_dir = os.path.dirname(download_file_name)
-    print("getting", video_link, download_file_name)
-    # https://github.com/ytdl-org/youtube-dl/blob/master/README.md#embedding-youtube-dl
-    if not os.path.exists(download_file_name):
-        download_youtube_video(video_id, video_format, download_dir) # video and poster
-        download_youtube_subs(video_id, download_dir) # native subtitles
-        if sub_gen:
-            download_youtube_auto_sub(video_id, NATIVE_LANGUAGE, download_dir) # one generated subtitle
-
-    dst_file = TARGET_DIR + asset_file_name
-    dst_dir = os.path.dirname(dst_file)
-    if not os.path.exists(dst_file):
-        copy_downloaded_file(download_file_name, dst_file)
-        copy_multiple_files(NON_HTML_DOWNLOAD_DIR + vtt_pattern, dst_dir) # do subtitle files
 
 def is_link_included(url):
     # check if link matches patterns to include
@@ -565,6 +501,12 @@ def get_site_asset(url, content_type):
         if os.path.exists(download_file_name): # in case could not be downloaded or doesn't exist at source
             copy_downloaded_file(download_file_name, dst_file)
 
+def copy_external_html_file(url): # used for psudo urls
+    asset_file_name = url_to_file_name(url, None)
+    download_file_name = HTML_DOWNLOAD_DIR + asset_file_name
+    dst_file = TARGET_DIR + asset_file_name
+    copy_downloaded_file(download_file_name, dst_file)
+
 def get_course_index_head_lines():
     head_lines = '''
     <link rel="stylesheet" href="https://edu.gcfglobal.org/styles/deployment-en/tutorial.concat.css">
@@ -605,15 +547,16 @@ def get_head_lines():
 def get_logo_lines(link='#'):
     logo_lines = '<div style="margin-left:20px;">'
     logo_lines += '<a class="logo-link" href="' + START_PAGE + '">'
-    logo_lines += '<img style="height:50px;" class="logo logo-left main-logo-en" src="/assets/gcfglobal-color.png"></a>'
+    logo_lines += '<img style="height:50px;" class="logo logo-left main-logo-en" src="https://media.gcflearnfree.org/global/gcfglobal-color.png"></a>'
     logo_lines += '<a class="logo-link" href="' + link + '">'
-    logo_lines += '<img style="height:60px;" class="logo logo-middle logo-en" src="/assets/logo.png"></a>'
+    logo_lines += '<img style="height:60px;" class="logo logo-middle logo-en" src="https://media.gcflearnfree.org/assets/logo/logo.png"></a>'
     logo_lines += '</div>'
 
     return logo_lines
 
 # also http://jsfiddle.net/wSd32/1/
 def get_bottom_nav(nav_up_link, nav_left_link, nav_right_link):
+    # img src below are pseudo urls for files supplied from NotFromSite
     left_opacity = '1.0'
     right_opacity = '1.0'
 
@@ -627,11 +570,11 @@ def get_bottom_nav(nav_up_link, nav_left_link, nav_right_link):
 
     nav_lines = '<div style="text-align:center;margin-top:40px;width: 400px;margin-left: auto;margin-right: auto;">'
     nav_lines += '<div style="float: left;"><a href="' + nav_left_link + '">'
-    nav_lines += '<img src="/assets/left-arrow.png" style="opacity:' + left_opacity + ';"></a></div>'
+    nav_lines += '<img src="https://media.gcflearnfree.org/global/left-arrow.png" style="opacity:' + left_opacity + ';"></a></div>'
     nav_lines += '<div style="float: right;"><a href="' + nav_right_link + '">'
-    nav_lines += '<img src="/assets/right-arrow.png" style="opacity:' + right_opacity + ';"></a></div>'
+    nav_lines += '<img src="https://media.gcflearnfree.org/global/right-arrow.png" style="opacity:' + right_opacity + ';"></a></div>'
     nav_lines += '<div style="text-align:left;margin:0 auto !important;display:inline-block;"><a href="' + nav_up_link + '">'
-    nav_lines += '<img src="/assets/up-arrow.png"></a></div>'
+    nav_lines += '<img src="https://media.gcflearnfree.org/global/up-arrow.png"></a></div>'
     nav_lines += '</div>'
     return nav_lines
 
