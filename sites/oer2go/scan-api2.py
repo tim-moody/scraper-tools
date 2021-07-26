@@ -56,8 +56,10 @@ skip_zims = ['fr-gutenberg_2021', 'pt-wikipedia_2021', 'hi-phet-zim_2021', 'fr-w
 # ? leave in catalog, but don't download correctly
 # these are known, but not sure if they work
 # they are not in the v1 catalog
+# in the v2 catalog all are is_hidden = 'Yes'
 # as of 7/23/2021 they are not in the IIAB module catalog
-skip = ['en-BYU_math',
+
+skip = ['en-BYU_math', # no download
     'es-mineduc',
     'es-appeducativas',
     'es_appeducativas',
