@@ -42,10 +42,12 @@ def get_kiwix_med_list():
         allpages = set()
     return allpages
 
-def get_mdwiki_list():
+def get_mdwiki_list(apfilterredir='nonredirects'):
     md_wiki_pages = set()
     for namesp in ['0', '3000']:
-        q = 'https://mdwiki.org/w/api.php?action=query&apnamespace=' + namesp + '&format=json&list=allpages&aplimit=max&apcontinue='
+        # q = 'https://mdwiki.org/w/api.php?action=query&apnamespace=' + namesp + '&format=json&list=allpages&aplimit=max&apcontinue='
+        q = 'https://mdwiki.org/w/api.php?action=query&apnamespace=' + namesp + '&format=json'
+        q += '&list=allpages&apfilterredir=' + apfilterredir + '&aplimit=max&apcontinue='
         apcontinue = ''
         loop_count = MAX_LOOPS
         while(loop_count):

@@ -184,7 +184,10 @@ def url_to_file_name(url, content_type, url_map=None, incl_netloc=True, incl_que
     if content_type == None:
         return None
     elif content_type == 'text/html':
-        ext = '/index.html'
+        if path and path[-1] == '/': # treat as directory
+            ext = 'index.html'
+        else:
+            ext = '' # otherwise allow html file names with no .html
     else:
         if path and path[-1] == '/': # treat final string as name not directory
             path = path[:-1]

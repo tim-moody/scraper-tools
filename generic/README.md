@@ -53,6 +53,8 @@ A page is searched for 'a' and 'link' tags that have an 'href' property and 'aud
 
 In order to be queued for parsing a url must return html and must not match Ignore Links, must match a Pattern to Include and not match a Pattern to Exclude.
 
+? Add constraining div container in do_one_page()
+
 ### Ignore Links
 
 These are things like 'javascript:void(0)' which will be ignored without any request for attributes. The list is in IGNORE_LINKS, which can be extended.
@@ -64,3 +66,9 @@ These are a list of strings or compiled regular expressions in HTML_INCL_PATTERN
 ### Url Patterns to Exclude
 
 These are a list of strings or compiled regular expressions in HTML_EXCL_PATTERNS. Any url that returns html is matched against these patterns and if there is a match it is not queued for parsing. Strings match to the first part of the url.
+
+## Output
+
+* url_to_file_name
+
+* always add .html or not
