@@ -305,10 +305,9 @@ class BasicSpider(SpiderCore):
         Download `url` (following redirects) and soupify response contents.
         Returns (final_url, page) where final_url is URL afrer following redirects.
         """
-        response = self.make_request(url, *args, **kwargs)
+        response = self.download_page_html(url, *args, **kwargs)
         if not response:
             return (None, None)
-        response.encoding = 'utf-8'
         html = response.text
         content_type = 'text/html'
         download_file_name = url_to_file_name(url, content_type)
@@ -316,6 +315,16 @@ class BasicSpider(SpiderCore):
         write_html_file(output_file_path, html)
         return (response.url, html)
 
+    def download_page_html(self, url, *args, **kwargs):
+        """
+        Download `url` (following redirects) and soupify response contents.
+        Returns (final_url, page) where final_url is URL afrer following redirects.
+        """
+        response = self.make_request(url, *args, **kwargs)
+        if not response:
+            return None
+        response.encoding = 'utf-8'
+        return (response)
 
     def make_request(self, url, timeout=60, *args, method='GET', **kwargs):
         """

@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 import sys
 import requests
+from basicspider.crawl import BasicSpider
 
 # revisions https://mdwiki.org/w/api.php?action=query&format=json&list=allrevisions&arvdir=newer&arvlimit=max&arvcontinue=
 
