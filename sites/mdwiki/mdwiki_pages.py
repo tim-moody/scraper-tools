@@ -23,9 +23,14 @@ MAX_LOOPS = -1 # -1 is all
 def main(args):
     en_wp_med = get_kiwix_med_list() # list from kiwix medicine
     mdwiki_list = get_mdwiki_list() # list from mdwiki api
-    en_wp_only = en_wp_med - mdwiki_list # items only in en wp
-    en_wip_redir = get_en_wp_redirects(en_wp_only)
-    combined = mdwiki_list + en_wp_med + en_wip_redir
+    #en_wp_only = en_wp_med - mdwiki_list # items only in en wp
+    #en_wip_redir = get_en_wp_redirects(en_wp_only)
+    #combined = mdwiki_list + en_wp_med + en_wip_redir
+    combined = list(set(en_wp_med + en_wp_med))
+
+    with open('mdwiki.tsv', 'w') as f:
+        f.write(combined)
+
 
     logging.info('List Creation Succeeded.')
     sys.exit(0)
