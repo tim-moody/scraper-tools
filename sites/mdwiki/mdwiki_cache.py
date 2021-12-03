@@ -25,7 +25,59 @@ from basicspider.sp_lib import *
 LOCAL_SETTINGS = '/library/www/html/w/LocalSettings.php'
 DBPW = 'Monkey123'
 WPMED_LIST = 'http://download.openzim.org/wp1/enwiki/customs/medicine.tsv'
-HOME_PAGE = 'WikiProjectMed:App/IntroPage'
+HOME_PAGE = "WikiProjectMed:App/IntroPage"
+HOME_PAGE_LIST = [HOME_PAGE,
+                "WikiProjectMed:Cancer care",
+                "WikiProjectMed:Children's health",
+                "WikiProjectMed:Ears nose throat",
+                "WikiProjectMed:Endocrine disease",
+                "WikiProjectMed:Eye diseases",
+                "WikiProjectMed:General surgery",
+                "WikiProjectMed:Heart disease",
+                "WikiProjectMed:Infectious disease",
+                "WikiProjectMed:Medications",
+                "WikiProjectMed:Men's health",
+                "WikiProjectMed:Neurology",
+                "WikiProjectMed:Orthopedics",
+                "WikiProjectMed:Mental health",
+                "WikiProjectMed:Skin diseases",
+                "WikiProjectMed:Women's health"
+                ]
+not_HOME_PAGE_LIST = [HOME_PAGE,
+                "WikiProjectMed%3AMen%27s_health",
+                "WikiProjectMed%3AChildren%27s_health",
+                "WikiProjectMed%3AHeart_disease",
+                "WikiProjectMed%3AEye_diseases",
+                "WikiProjectMed%3AWomen%27s_health",
+                "WikiProjectMed%3AMental_health",
+                "WikiProjectMed%3AEars_nose_throat",
+                "WikiProjectMed%3AMedications",
+                "WikiProjectMed%3AInfectious_disease",
+                "WikiProjectMed%3AEndocrine_disease",
+                "WikiProjectMed%3ASkin_diseases",
+                "WikiProjectMed%3AGeneral_surgery",
+                "WikiProjectMed%3ACancer_care",
+                "WikiProjectMed%3AOrthopedics",
+                "WikiProjectMed%3ANeurology"
+                ]
+HOME_PAGE_LIST = [HOME_PAGE,
+                "WikiProjectMed:Cancer_care",
+                "WikiProjectMed:Children's_health",
+                "WikiProjectMed:Ears_nose_throat",
+                "WikiProjectMed:Endocrine_disease",
+                "WikiProjectMed:Eye_diseases",
+                "WikiProjectMed:General_surgery",
+                "WikiProjectMed:Heart_disease",
+                "WikiProjectMed:Infectious_disease",
+                "WikiProjectMed:Medications",
+                "WikiProjectMed:Men's_health",
+                "WikiProjectMed:Neurology",
+                "WikiProjectMed:Orthopedics",
+                "WikiProjectMed:Mental_health",
+                "WikiProjectMed:Skin_diseases",
+                "WikiProjectMed:Women's_health"
+                 ]
+
 mdwiki_list = []
 mdwiki_domain = 'https://mdwiki.org'
 enwp_list = []
@@ -250,29 +302,28 @@ def get_enwp_page_list():
 
 def get_mdwiki_page_list():
     global mdwiki_list
-    mdwiki_list = []
-    mdwiki_list.append(HOME_PAGE)
-
-    # q = 'https://mdwiki.org/w/api.php?action=query&apnamespace=' + namesp + '&format=json&list=allpages&aplimit=max&apcontinue='
-    q = 'https://mdwiki.org/w/api.php?action=query&apnamespace=0&format=json'
-    q += '&list=allpages&apfilterredir=nonredirects&aplimit=max&apcontinue='
-    apcontinue = ''
-    loop_count = -1
-    while(loop_count):
-        try:
-            r = requests.get(q + apcontinue).json()
-        except Exception as error:
-            logging.error(error)
-            logging.error('Request failed. Exiting.')
-            sys.exit(1)
-        pages = r['query']['allpages']
-        apcontinue = r.get('continue',{}).get('apcontinue')
-        for page in pages:
-            mdwiki_list.append(page['title'].replace(' ', '_'))
-        if not apcontinue:
-            break
-        loop_count -= 1
-
+    #mdwiki_list = HOME_PAGE_LIST
+    mdwiki_list = [HOME_PAGE]
+    for namesp in ['0', '4']:
+        # q = 'https://mdwiki.org/w/api.php?action=query&apnamespace=' + namesp + '&format=json&list=allpages&aplimit=max&apcontinue='
+        q = 'https://mdwiki.org/w/api.php?action=query&apnamespace=' + namesp + '&format=json'
+        q += '&list=allpages&apfilterredir=nonredirects&aplimit=max&apcontinue='
+        apcontinue = ''
+        loop_count = -1
+        while(loop_count):
+            try:
+                r = requests.get(q + apcontinue).json()
+            except Exception as error:
+                logging.error(error)
+                logging.error('Request failed. Exiting.')
+                sys.exit(1)
+            pages = r['query']['allpages']
+            apcontinue = r.get('continue',{}).get('apcontinue')
+            for page in pages:
+                mdwiki_list.append(page['title'].replace(' ', '_'))
+            if not apcontinue:
+                break
+            loop_count -= 1
 
 def run(server_class=HTTPServer, handler_class=S, port=8080):
     global request_paths
@@ -303,6 +354,7 @@ def run(server_class=HTTPServer, handler_class=S, port=8080):
     get_mdwiki_passwd()
     get_enwp_page_list()
     get_mdwiki_page_list()
+    logging.info('Mdwiki cache ready\n')
 
     try:
         httpd.serve_forever()
