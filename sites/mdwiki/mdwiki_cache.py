@@ -79,6 +79,10 @@ HOME_PAGE_LIST = [HOME_PAGE,
                  ]
 
 mdwiki_list = []
+mdwiki_redirects_raw = {}
+mdwiki_redirect_list = []
+mdwiki_rd_lookup = {}
+
 mdwiki_domain = 'https://mdwiki.org'
 enwp_list = []
 enwp_domain = 'https://en.wikipedia.org'
@@ -155,9 +159,12 @@ class S(BaseHTTPRequestHandler):
         self.wfile.write(resp.content)
         return
 
-    def get_redir_path(self, path):
-        #print('in get redir path')
-        # path can have multiple titles
+    def get_redir_path(self, path): # top level
+        # path queried for redirects can have multiple titles
+        # break them out because some could be mdwiki and some enwp
+        # the query also requests other properties than redirect
+        # process redirect separately from the other properties
+        # skip enwp page redirect if is name of mdwiki page or redirect
         args = parse_qs(urlparse(path).query)
         titles = args['titles'][0].split('|')
         base_query = path.split('&titles=')[0] + '&titles='
@@ -165,7 +172,7 @@ class S(BaseHTTPRequestHandler):
         pages_resp = {}
         title_page_ids = {}
         for title in titles:
-            if title in mdwiki_list:
+            if title in mdwiki_list: # do one mdwiki title
                 #print(f'Getting redirect for {title}')
                 # remove redirect from query
                 query = base_query.replace('&prop=redirects%7C', '&prop=') + title
@@ -179,32 +186,31 @@ class S(BaseHTTPRequestHandler):
                 #pages_resp[title] = {}
                 #pages_resp[title][mdwiki_pageid] = page_resp
                 pages_resp[mdwiki_pageid] = page_resp
-                redirects = []
-                db_redirects = get_mdwiki_redirects(title)
-                for rd in db_redirects:
-                    redirect = {'pageid': rd['rd_from'], 'ns': rd['rd_namespace'], 'title': rd['page_title'].decode('utf8')}
-                    redirects.append(redirect)
-                #pages_resp[title][mdwiki_pageid]['redirects'] = redirects
+
+                redirects = get_mdwiki_redirects(title) # all redirects for this title known to mdwiki
                 pages_resp[mdwiki_pageid]['redirects'] = redirects
 
-                if title in enwp_list: # get any redirects from EN WP
-                    mdwiki_rd_titles = []
-                    for rd in redirects:
-                        mdwiki_rd_titles.append(rd['title'])
-
+                # get any redirects from EN WP
+                # do not include if is name of page or redirect on mdwiki
+                # mdwiki is primary so we only want any unknown redirects
+                if title in enwp_list:
+                    # now get list from enwp
                     enwp_resp = self.enwp_session.get(enwp_domain + more_rd_query + title)
                     wp_batch_resp = json.loads(enwp_resp.content)
                     enwp_pageid = next(iter(wp_batch_resp['query']['pages'])) # there should only be one
                     enwp_rd = wp_batch_resp['query']['pages'][enwp_pageid].get('redirects', []) # make it have an empty list instead of no list
-                    title_page_ids[title]['enwp_pageid'] = enwp_pageid
+                    title_page_ids[title]['enwp_pageid'] = enwp_pageid # store in case need it
 
                     for rd in enwp_rd:
-                        if rd['title'] not in mdwiki_rd_titles:
-                            redirects.append(rd)
+                        if rd['title'] in mdwiki_list: # exclude because is somewhere in mdwiki titles
+                            continue
+                        if rd['title'] in mdwiki_redirect_list: # exclude because is somewhere in mdwiki redirects
+                            continue
+                        redirects.append(rd) # add it
 
                     #pages_resp[title][mdwiki_pageid]['redirects'] = redirects
                     pages_resp[mdwiki_pageid]['redirects'] = redirects
-            else:
+            else: # do one enwp title that is not in mdwiki
                 resp = self.enwp_session.get(enwp_domain + base_query + title)
                 #enwp_resp = requests.session.get(enwp_domain + base_query + title)
                 batch_resp = json.loads(resp.content)
@@ -216,6 +222,7 @@ class S(BaseHTTPRequestHandler):
                 #pages_resp[title][enwp_pageid] = page_resp
                 pages_resp[enwp_pageid] = page_resp
 
+        # now reassemble response for all page tiles requested
         #print('***pages_resp')
         #print(pages_resp)
         batch_resp['query']['pages'] = pages_resp
@@ -252,6 +259,11 @@ class S(BaseHTTPRequestHandler):
         self.end_headers()
 
 def get_mdwiki_redirects(rd_to_title):
+    # returns list of dict of redirects to td_to_title
+    rd_list = mdwiki_rd_lookup[rd_to_title] # list of rd_from_titles for rd_to_titles
+    return rd_list
+
+def get_mdwiki_redirects_from_db(rd_to_title):
     con = pymysql.connect(host='localhost',
                         user='mdwiki',
                         password=DBPW,
@@ -294,7 +306,8 @@ def get_enwp_page_list():
         r = requests.get(WPMED_LIST)
         wikimed_pages = r._content.decode().split('\n')[:-1]
         for p in wikimed_pages:
-            enwp_list.append(p.replace(' ', '_'))
+            if p not in mdwiki_redirect_list and p not in mdwiki_list:
+                enwp_list.append(p.replace(' ', '_'))
     except Exception as error:
         logging.error(error)
         logging.error('Request for medicine.tsv failed. Exiting.')
@@ -325,6 +338,38 @@ def get_mdwiki_page_list():
                 break
             loop_count -= 1
 
+def get_mdwiki_redirect_lists():
+    # redirect.json
+    #   rd_from_id
+    #   rd_to_namespace
+    #   rd_to_title_hex
+    #   rd_from_name_hex
+#
+
+    global mdwiki_redirects_raw
+    global mdwiki_redirect_list
+    global mdwiki_rd_lookup
+
+    mdwiki_redirects_raw = {}
+    mdwiki_redirect_list = []
+    mdwiki_rd_lookup = {}
+
+    try:
+        mdwiki_redirects_hex = read_json_file('redirect.json')
+    except Exception as error:
+        logging.error(error)
+        logging.error('Reading redirect.json failed.')
+
+    for rd in mdwiki_redirects_hex:
+        if rd['rd_to_namespace'] != 0: # skip if not in 0 namespace
+            continue
+        rd_from_title = bytearray.fromhex(rd['rd_from_name_hex'][2:]).decode()
+        rd_to_title = bytearray.fromhex(rd['rd_to_title_hex'][2:]).decode()
+        mdwiki_redirect_list.append(rd_from_title)
+        if rd_to_title not in mdwiki_rd_lookup:
+            mdwiki_rd_lookup[rd_to_title] = []
+        mdwiki_rd_lookup[rd_to_title].append({'pageid': rd['rd_from_id'], 'ns': rd['rd_to_namespace'], 'title': rd_from_title})
+
 def run(server_class=HTTPServer, handler_class=S, port=8080):
     global request_paths
     # logging.basicConfig(level=logging.INFO)
@@ -351,9 +396,10 @@ def run(server_class=HTTPServer, handler_class=S, port=8080):
     #handler_class.session = CachedSession()
     handler_class.enwp_session = CachedSession(enwp_db, backend='sqlite')
     handler_class.mdwiki_session = CachedSession(mdwiki_db, backend='sqlite')
-    get_mdwiki_passwd()
-    get_enwp_page_list()
+    # get_mdwiki_passwd()
     get_mdwiki_page_list()
+    get_mdwiki_redirect_lists()
+    get_enwp_page_list()
     logging.info('Mdwiki cache ready\n')
 
     try:
