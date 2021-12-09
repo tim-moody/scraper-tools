@@ -17,6 +17,7 @@ import sys
 import time
 import requests
 import json
+import base64
 import pymysql.cursors
 from urllib.parse import urljoin, urldefrag, urlparse, parse_qs
 from requests_cache import CachedSession
@@ -26,60 +27,8 @@ LOCAL_SETTINGS = '/library/www/html/w/LocalSettings.php'
 DBPW = 'Monkey123'
 WPMED_LIST = 'http://download.openzim.org/wp1/enwiki/customs/medicine.tsv'
 HOME_PAGE = "WikiProjectMed:App/IntroPage"
-HOME_PAGE_LIST = [HOME_PAGE,
-                "WikiProjectMed:Cancer care",
-                "WikiProjectMed:Children's health",
-                "WikiProjectMed:Ears nose throat",
-                "WikiProjectMed:Endocrine disease",
-                "WikiProjectMed:Eye diseases",
-                "WikiProjectMed:General surgery",
-                "WikiProjectMed:Heart disease",
-                "WikiProjectMed:Infectious disease",
-                "WikiProjectMed:Medications",
-                "WikiProjectMed:Men's health",
-                "WikiProjectMed:Neurology",
-                "WikiProjectMed:Orthopedics",
-                "WikiProjectMed:Mental health",
-                "WikiProjectMed:Skin diseases",
-                "WikiProjectMed:Women's health"
-                ]
-not_HOME_PAGE_LIST = [HOME_PAGE,
-                "WikiProjectMed%3AMen%27s_health",
-                "WikiProjectMed%3AChildren%27s_health",
-                "WikiProjectMed%3AHeart_disease",
-                "WikiProjectMed%3AEye_diseases",
-                "WikiProjectMed%3AWomen%27s_health",
-                "WikiProjectMed%3AMental_health",
-                "WikiProjectMed%3AEars_nose_throat",
-                "WikiProjectMed%3AMedications",
-                "WikiProjectMed%3AInfectious_disease",
-                "WikiProjectMed%3AEndocrine_disease",
-                "WikiProjectMed%3ASkin_diseases",
-                "WikiProjectMed%3AGeneral_surgery",
-                "WikiProjectMed%3ACancer_care",
-                "WikiProjectMed%3AOrthopedics",
-                "WikiProjectMed%3ANeurology"
-                ]
-HOME_PAGE_LIST = [HOME_PAGE,
-                "WikiProjectMed:Cancer_care",
-                "WikiProjectMed:Children's_health",
-                "WikiProjectMed:Ears_nose_throat",
-                "WikiProjectMed:Endocrine_disease",
-                "WikiProjectMed:Eye_diseases",
-                "WikiProjectMed:General_surgery",
-                "WikiProjectMed:Heart_disease",
-                "WikiProjectMed:Infectious_disease",
-                "WikiProjectMed:Medications",
-                "WikiProjectMed:Men's_health",
-                "WikiProjectMed:Neurology",
-                "WikiProjectMed:Orthopedics",
-                "WikiProjectMed:Mental_health",
-                "WikiProjectMed:Skin_diseases",
-                "WikiProjectMed:Women's_health"
-                 ]
 
 mdwiki_list = []
-mdwiki_redirects_raw = {}
 mdwiki_redirect_list = []
 mdwiki_rd_lookup = {}
 
@@ -217,9 +166,17 @@ class S(BaseHTTPRequestHandler):
                 enwp_pageid = next(iter(batch_resp['query']['pages'])) # there should only be one
                 title_page_ids[title] = {}
                 title_page_ids[title]['enwp_pageid'] = enwp_pageid
+                title_rds = batch_resp['query']['pages'][enwp_pageid].get('redirects', [])
+
+                # add any mdwiki redirects to this enwp page
+                more_rds = mdwiki_rd_lookup.get(title, [])
+                title_rds += more_rds
+
+                if title_rds: # not sure if mwoffliner supports empty redirects list
+                    batch_resp['query']['pages'][enwp_pageid]['redirects'] = title_rds
+
                 page_resp = batch_resp['query']['pages'][enwp_pageid]
-                #pages_resp[title] = {}
-                #pages_resp[title][enwp_pageid] = page_resp
+
                 pages_resp[enwp_pageid] = page_resp
 
         # now reassemble response for all page tiles requested
@@ -260,7 +217,7 @@ class S(BaseHTTPRequestHandler):
 
 def get_mdwiki_redirects(rd_to_title):
     # returns list of dict of redirects to td_to_title
-    rd_list = mdwiki_rd_lookup[rd_to_title] # list of rd_from_titles for rd_to_titles
+    rd_list = mdwiki_rd_lookup.get(rd_to_title, []) # list of rd_from_titles for rd_to_titles
     return rd_list
 
 def get_mdwiki_redirects_from_db(rd_to_title):
@@ -301,42 +258,27 @@ def get_mdwiki_passwd():
 
 def get_enwp_page_list():
     global enwp_list
-    enwp_list = []
+    #mdwiki_redirects = read_json_file('data/mdwiki_redirects.json')
     try:
-        r = requests.get(WPMED_LIST)
-        wikimed_pages = r._content.decode().split('\n')[:-1]
-        for p in wikimed_pages:
-            if p not in mdwiki_redirect_list and p not in mdwiki_list:
-                enwp_list.append(p.replace(' ', '_'))
+        with open('data/enwp.tsv') as f:
+            txt = f.read()
+        enwp_list = txt.split('\n')
     except Exception as error:
         logging.error(error)
-        logging.error('Request for medicine.tsv failed. Exiting.')
+        logging.error('Failed to read enwp.tsv. Exiting.')
         sys.exit(1)
 
 def get_mdwiki_page_list():
     global mdwiki_list
-    #mdwiki_list = HOME_PAGE_LIST
-    mdwiki_list = [HOME_PAGE]
-    for namesp in ['0', '4']:
-        # q = 'https://mdwiki.org/w/api.php?action=query&apnamespace=' + namesp + '&format=json&list=allpages&aplimit=max&apcontinue='
-        q = 'https://mdwiki.org/w/api.php?action=query&apnamespace=' + namesp + '&format=json'
-        q += '&list=allpages&apfilterredir=nonredirects&aplimit=max&apcontinue='
-        apcontinue = ''
-        loop_count = -1
-        while(loop_count):
-            try:
-                r = requests.get(q + apcontinue).json()
-            except Exception as error:
-                logging.error(error)
-                logging.error('Request failed. Exiting.')
-                sys.exit(1)
-            pages = r['query']['allpages']
-            apcontinue = r.get('continue',{}).get('apcontinue')
-            for page in pages:
-                mdwiki_list.append(page['title'].replace(' ', '_'))
-            if not apcontinue:
-                break
-            loop_count -= 1
+
+    try:
+        with open('data/mdwiki.tsv') as f:
+            txt = f.read()
+        mdwiki_list = txt.split('\n')
+    except Exception as error:
+        logging.error(error)
+        logging.error('Failed to read mdwiki.tsv. Exiting.')
+        sys.exit(1)
 
 def get_mdwiki_redirect_lists():
     # redirect.json
@@ -344,31 +286,13 @@ def get_mdwiki_redirect_lists():
     #   rd_to_namespace
     #   rd_to_title_hex
     #   rd_from_name_hex
-#
 
-    global mdwiki_redirects_raw
     global mdwiki_redirect_list
     global mdwiki_rd_lookup
 
-    mdwiki_redirects_raw = {}
-    mdwiki_redirect_list = []
-    mdwiki_rd_lookup = {}
-
-    try:
-        mdwiki_redirects_hex = read_json_file('redirect.json')
-    except Exception as error:
-        logging.error(error)
-        logging.error('Reading redirect.json failed.')
-
-    for rd in mdwiki_redirects_hex:
-        if rd['rd_to_namespace'] != 0: # skip if not in 0 namespace
-            continue
-        rd_from_title = bytearray.fromhex(rd['rd_from_name_hex'][2:]).decode()
-        rd_to_title = bytearray.fromhex(rd['rd_to_title_hex'][2:]).decode()
-        mdwiki_redirect_list.append(rd_from_title)
-        if rd_to_title not in mdwiki_rd_lookup:
-            mdwiki_rd_lookup[rd_to_title] = []
-        mdwiki_rd_lookup[rd_to_title].append({'pageid': rd['rd_from_id'], 'ns': rd['rd_to_namespace'], 'title': rd_from_title})
+    mdwiki_redirects = read_json_file('data/mdwiki_redirects.json')
+    mdwiki_redirect_list = mdwiki_redirects['list']
+    mdwiki_rd_lookup = mdwiki_redirects['lookup']
 
 def run(server_class=HTTPServer, handler_class=S, port=8080):
     global request_paths
@@ -397,6 +321,7 @@ def run(server_class=HTTPServer, handler_class=S, port=8080):
     handler_class.enwp_session = CachedSession(enwp_db, backend='sqlite')
     handler_class.mdwiki_session = CachedSession(mdwiki_db, backend='sqlite')
     # get_mdwiki_passwd()
+    logging.info('Getting page and redirect lists...\n')
     get_mdwiki_page_list()
     get_mdwiki_redirect_lists()
     get_enwp_page_list()
