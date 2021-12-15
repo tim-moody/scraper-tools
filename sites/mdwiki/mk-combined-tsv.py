@@ -88,7 +88,7 @@ def main():
 
 def get_mdwiki_list(apfilterredir='nonredirects'):
     md_wiki_pages = []
-    for namesp in ['0', '4']:
+    for namesp in ['0']:
         # q = 'https://mdwiki.org/w/api.php?action=query&apnamespace=' + namesp + '&format=json&list=allpages&aplimit=max&apcontinue='
         q = 'https://mdwiki.org/w/api.php?action=query&apnamespace=' + namesp + '&format=json'
         q += '&list=allpages&apfilterredir=nonredirects&aplimit=max&apcontinue='
