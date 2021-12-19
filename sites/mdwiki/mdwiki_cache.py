@@ -142,6 +142,11 @@ class S(BaseHTTPRequestHandler):
                 # get any redirects from EN WP
                 # do not include if is name of page or redirect on mdwiki
                 # mdwiki is primary so we only want any unknown redirects
+
+                #'Gefitinib' in enwp_list
+                #False
+                # problem is that titles in enwp_list removed if in mdwiki_list
+                # excluded in mk-combined
                 if title in enwp_list:
                     # now get list from enwp
                     enwp_resp = self.enwp_session.get(enwp_domain + more_rd_query + title)

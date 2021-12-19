@@ -55,7 +55,7 @@ def main():
     logging.info('Processing downloaded list of redirects from mdwiki.')
     get_mdwiki_redirect_lists()
     logging.info('Getting list of pages from EN WP.')
-    enwp_list = get_kiwix_med_list() # list from kiwix medicine
+    enwp_list = get_enwp_list() # list from kiwix medicine
 
     write_output(mdwiki_list, 'mdwiki.tsv')
     write_output(enwp_list, 'enwp.tsv')
@@ -118,7 +118,6 @@ def get_mdwiki_redirect_lists():
     #   rd_to_namespace
     #   rd_to_title_hex
     #   rd_from_name_hex
-#
 
     global mdwiki_redirects_raw
     global mdwiki_redirect_list
@@ -152,28 +151,30 @@ def get_mdwiki_redirect_lists():
             mdwiki_rd_lookup[rd_to_title] = []
         mdwiki_rd_lookup[rd_to_title].append({'pageid': rd['rd_from_id'], 'ns': rd['rd_to_namespace'], 'title': rd_from_title})
 
-def get_kiwix_med_list():
-    allpages = []
+def get_enwp_list():
+    enwp_pages = []
     try:
-        r = requests.get(WPMED_LIST)
+        r = requests.get(WPMED_LIST) # medicine.tsv
         wikimed_pages = r._content.decode().split('\n')
         for p in wikimed_pages[0:-1]:
             if p in EXCLUDE_PAGES:
                 continue
-            if p in mdwiki_list: # exclude because is somewhere in mdwiki titles
-                continue
+
+            # Do Not Exclude because is somewhere in mdwiki titles
+            # enwp_list needs these duplicates
+
             if p in mdwiki_redirect_list: # exclude because is somewhere in mdwiki redirects
                 continue
-            allpages.append(p.replace(' ', '_'))
-        # now add in any redirects from mdwiki to enwp pages
+            enwp_pages.append(p.replace(' ', '_'))
+        # now add in any enwp pages that are the target of an mdwiki redirect
         for p in mdwiki_rd_lookup.keys():
-            if p not in allpages:
-                allpages.append(p.replace(' ', '_'))
+            if p not in enwp_pages:
+                enwp_pages.append(p.replace(' ', '_'))
     except Exception as error:
         logging.error(error)
         logging.error('Request for medicine.tsv failed. Ignoring.')
-        allpages = []
-    return allpages
+        enwp_pages = []
+    return enwp_pages
 
 def write_output(data, output_file):
     try:
