@@ -61,8 +61,10 @@ class S(BaseHTTPRequestHandler):
             if '&prop=redirects' in self.path:
                 self.get_redir_path(self.path)
             else:
-                # this is not expected
-                logging.error("Skipping Unknown Path: %s\n", str(self.path))
+                # this is not expected for zims
+                # but can happen when mirroring site
+                # logging.error("Skipping Unknown Path: %s\n", str(self.path))
+                self.get_mdwiki_url(self.path)
         elif '&page=' in self.path:
             # page = self.path.split('&page=')[1]
             args = parse_qs(urlparse(self.path).query)
